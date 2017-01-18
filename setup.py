@@ -7,6 +7,7 @@ import sys
 import platform
 import subprocess as sp
 import os.path
+import string 
 
 
 # Now get include paths from relevant python modules
@@ -38,6 +39,21 @@ elif 'euler' in platform.node():
     extra_objects=['./RRTMG/rrtmg_build/rrtmg_combined.o']
     netcdf_include = '/cluster/apps/netcdf/4.3.1/x86_64/gcc_4.8.2/openmpi_1.6.5/include'
     netcdf_lib = '/cluster/apps/netcdf/4.3.1/x86_64/gcc_4.8.2/openmpi_1.6.5/lib'
+    f_compiler = 'gfortran'
+elif platform.machine()  == 'x86_64':
+    #Compile flags for fram @ Caltech
+    library_dirs = string.split(os.environ['LD_LIBRARY_PATH'],':')  
+    libraries = []
+    libraries.append('mpi')
+    libraries.append('gfortran')
+    print libraries 
+    extensions = []
+    extra_compile_args=[]
+    #extra_compile_args+=['-std=c99', '-O3', '-march=native', '-Wno-unused',
+    #                     '-Wno-#warnings', '-Wno-maybe-uninitialized', '-Wno-cpp', '-Wno-array-bounds','-fPIC']
+    extra_objects=['./RRTMG/rrtmg_build/rrtmg_combined.o']
+    netcdf_include = '/opt/netcdf4/include'
+    netcdf_lib = '/opt/netcdf4/lib'
     f_compiler = 'gfortran'
 
 else:
@@ -184,6 +200,12 @@ _ext = Extension('Surface', ['Surface.pyx'], include_dirs=include_path,
                  runtime_library_dirs=library_dirs)
 extensions.append(_ext)
 
+
+_ext = Extension('SurfaceBudget', ['SurfaceBudget.pyx'], include_dirs=include_path,
+                 extra_compile_args=extra_compile_args, libraries=libraries, library_dirs=library_dirs,
+                 runtime_library_dirs=library_dirs)
+extensions.append(_ext)
+
 _ext = Extension('Damping', ['Damping.pyx'], include_dirs=include_path,
                  extra_compile_args=extra_compile_args, libraries=libraries, library_dirs=library_dirs,
                  runtime_library_dirs=library_dirs)
@@ -213,7 +235,10 @@ _ext = Extension('ConditionalStatistics', ['ConditionalStatistics.pyx'], include
                  extra_compile_args=extra_compile_args, libraries=libraries, library_dirs=library_dirs,
                  runtime_library_dirs=library_dirs)
 extensions.append(_ext)
-
+_ext = Extension('Tracers', ['Tracers.pyx'], include_dirs=include_path,
+                 extra_compile_args=extra_compile_args, libraries=libraries, library_dirs=library_dirs,
+                 runtime_library_dirs=library_dirs)
+extensions.append(_ext)
 
 _ext = Extension('Restart', ['Restart.pyx'], include_dirs=include_path,
                  extra_compile_args=extra_compile_args, libraries=libraries, library_dirs=library_dirs,
