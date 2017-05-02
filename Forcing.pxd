@@ -181,8 +181,13 @@ cdef class ForcingGCMFixed:
         double [:] subsidence
         double [:] temp_dt_hadv
         double [:] temp_dt_fino
-        double [:] shum_dt
+        double [:] temp_dt_eddy
+        double [:] shum_dt_eddy
+        double [:] shum_dt_vadv
+        double [:] shum_dt_hadv
         double [:] p_gcm
+        double [:] rho_gcm
+        double [:] rho_half_gcm
         double coriolis_param
         str file
         double lat
@@ -202,6 +207,7 @@ cdef class ForcingGCMVarying:
         double [:] subsidence
         double [:] temp_dt
         double [:] shum_dt
+
 
         #For computing timevarying forcing
         double [:] p_gcm

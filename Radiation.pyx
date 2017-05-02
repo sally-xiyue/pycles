@@ -39,10 +39,10 @@ def RadiationFactory(namelist, LatentHeat LH, ParallelMPI.ParallelMPI Pa):
     else:
         casename = namelist['meta']['casename']
         if casename == 'DYCOMS_RF01':
-            return RadiationDyCOMS_RF01()
+            return RadiationDyCOMS_RF01(namelist)
         elif casename == 'DYCOMS_RF02':
             #Dycoms RF01 and RF02 use the same radiation
-            return RadiationDyCOMS_RF01()
+            return RadiationDyCOMS_RF01(namelist)
         elif casename == 'SMOKE':
             return RadiationSmoke()
         elif casename == 'Isdac':
@@ -152,10 +152,13 @@ cdef class RadiationNone(RadiationBase):
 
 
 cdef class RadiationDyCOMS_RF01(RadiationBase):
-    def __init__(self):
+    def __init__(self, namelist):
         self.alpha_z = 1.0
         self.kap = 85.0
-        self.f0 = 70.0
+        try:
+            self.f0 = namelist['radiation']['dycoms_f0']
+        except:
+            self.f0 = 70.0
         self.f1 = 22.0
         self.divergence = 3.75e-6
 
@@ -1254,6 +1257,7 @@ cdef class RadiationGCMGrey(RadiationBase):
         self.p_gcm = tv_input_data['p'][::-1, lat_idx]
         self.t_gcm = tv_input_data['t'][::-1,lat_idx]
         self.z_gcm = tv_input_data['z'][::-1,lat_idx]
+        self.alpha_gcm = tv_input_data['alpha'][::-1,lat_idx]
 
         RadiationBase.initialize(self, Gr, NS, Pa)
 
@@ -1270,7 +1274,7 @@ cdef class RadiationGCMGrey(RadiationBase):
         self.lw_linear_frac = 0.2
         self.albedo_value = 0.38
         self.atm_abs = 0.22
-        self.sw_diff = 0.20
+        self.sw_diff = 0.0
 
         self.odp = 1.0
 
@@ -1297,7 +1301,7 @@ cdef class RadiationGCMGrey(RadiationBase):
 
 
 
-
+        self.alpha_gcm = interp_pchip(np.array(Gr.zp_half), np.array(self.z_gcm)[:], np.array(self.alpha_gcm)[:])
         self.dp = abs(Ref.p0_half_global[kmax-1] - Ref.p0_half_global[kmax-2])
         self.p0_les_min = np.min(Ref.p0_half_global)
         #self.p_ext = np.arange(self.p0_les_min - self.dp, 10.0, -self.dp)
@@ -1305,9 +1309,10 @@ cdef class RadiationGCMGrey(RadiationBase):
         #self.t_ref = np.interp(Ref.p0_half_global[kmax-1],np.array(self.p_gcm)[::-1], np.array(self.t_gcm)[::-1] )
 
         self.p_ext = interp_pchip(np.array(Gr.zp_half), np.array(self.z_gcm)[:], np.log(np.array(self.p_gcm)[:]))
+
+
         self.n_ext_profile = self.p_ext.shape[0]
         self.p_ext = np.exp(np.array(self.p_ext))
-
 
         self.sw_tau = self.sw_tau0 * (np.array(self.p_ext)/101325.0)**self.sw_tau_exponent
         self.lw_tau = self.lw_tau0 * (self.lw_linear_frac *  np.array(self.p_ext)/101325.0 +
@@ -1371,8 +1376,7 @@ cdef class RadiationGCMGrey(RadiationBase):
         #self.t_ext = np.array(self.t_ext) + (temperature_profile[kmax] - self.t_ref  )
 
         #print self.t_ref, temperature_profile[kmax], temperature_profile[kmax] - self.t_ref, np.array(self.t_ext)
-        t_extended = self.t_ext #np.append(temperature_profile[Gr.dims.gw:Gr.dims.nlg[2]-Gr.dims.gw], self.t_ext)
-
+        t_extended = temperature_profile #np.append(temperature_profile[Gr.dims.gw:Gr.dims.nlg[2]-Gr.dims.gw], self.t_ext)
 
 
         #self.t_ext = np.array(self.t_ext) - (temperature_profile[kmax] - self.t_ref)
@@ -1382,22 +1386,23 @@ cdef class RadiationGCMGrey(RadiationBase):
             for k in xrange(self.n_ext_profile -1):
                 self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k])
 
+
         with nogil:
             for k in xrange(self.n_ext_profile):
                self.sw_down[k] = self.insolation * exp(-self.sw_tau[k])
         with nogil:
             for k in xrange(self.n_ext_profile):
-               self.sw_up[k]  = self.sw_down[0] * self.albedo_value
+               self.sw_up[k]  = self.sw_down[kmin-1] * self.albedo_value
 
         self.lw_down[self.n_ext_profile-1] = 0.0
         self.lw_dtrans[self.n_ext_profile-1] = 1.0
         with nogil:
             for k in xrange(self.n_ext_profile-1, 0, -1):
-                self.lw_down[k-1] = self.lw_down[k] * self.lw_dtrans[k] +  stefan * t_extended[k] **4.0 * (1.0 - self.lw_dtrans[k])
+                self.lw_down[k-1] = self.lw_down[k] * self.lw_dtrans[k] +  (stefan * t_extended[k] **4.0) * (1.0 - self.lw_dtrans[k])
 
-        self.lw_up[0] = stefan * Sur.T_surface**4.0
+        self.lw_up[kmin-1] = stefan * Sur.T_surface**4.0
         with nogil:
-            for k in xrange(1,self.n_ext_profile):
+            for k in xrange(kmin,kmax+1):
                 self.lw_up[k] = self.lw_up[k-1] * self.lw_dtrans[k] + (stefan * t_extended[k] ** 4.0)*(1.0 - self.lw_dtrans[k])
 
         with nogil:
@@ -1407,7 +1412,7 @@ cdef class RadiationGCMGrey(RadiationBase):
         with nogil:
             for k in xrange(0, kmax):
                 self.h_profile[k] =  - \
-                       (self.net_flux[k+1] - self.net_flux[k]) * dzi / rho_half[k] / cpm_c(qt_profile[k])
+                       (self.net_flux[k+1] - self.net_flux[k]) * dzi * self.alpha_gcm[k]  / cpm_c(qt_profile[k])*Gr.dims.imet_half[k]
         with nogil:
             for i in xrange(imin, imax):
                 ishift = i * istride
@@ -1415,18 +1420,19 @@ cdef class RadiationGCMGrey(RadiationBase):
                     jshift = j * jstride
                     for k in xrange(kmin, kmax):
                         ijk = ishift + jshift + k
-                        PV.tendencies[s_shift + ijk] +=  -(self.net_flux[k+1-Gr.dims.gw] - self.net_flux[k-Gr.dims.gw])*dzi/DV.values[t_shift+ijk]/ rho_half[k]
+                        #PV.tendencies[s_shift + ijk] +=  -(self.net_flux[k+1-Gr.dims.gw] - self.net_flux[k-Gr.dims.gw])*dzi/DV.values[t_shift+ijk]*Gr.dims.imet_half[k]
+                        PV.tendencies[s_shift + ijk] +=  -(self.net_flux[k+1] - self.net_flux[k])*dzi/DV.values[t_shift+ijk]*Gr.dims.imet_half[k]
 
         cdef double [:] t_mean = Pa.HorizontalMean(Gr, &DV.values[t_shift])
         with nogil:
             for k in xrange(kmin, kmax):
-                self.dsdt_profile[k] = -(self.net_flux[k+1-Gr.dims.gw] - self.net_flux[k-Gr.dims.gw])*dzi/t_mean[k]/ rho_half[k]
+                self.dsdt_profile[k] = -(self.net_flux[k+1] - self.net_flux[k])*dzi/t_mean[k]*Gr.dims.imet_half[k]
 
 
-        self.srf_lw_up = self.lw_up[0]
-        self.srf_lw_down = self.lw_down[0]
-        self.srf_sw_up= self.sw_up[0]
-        self.srf_sw_down= self.sw_down[0]
+        self.srf_lw_up = self.lw_up[kmin-1]
+        self.srf_lw_down = self.lw_down[kmin-1]
+        self.srf_sw_up= self.sw_up[kmin-1]
+        self.srf_sw_down= self.sw_down[kmin-1]
 
         return
 
@@ -1439,13 +1445,14 @@ cdef class RadiationGCMGrey(RadiationBase):
         NS.write_ts('srf_sw_flux_up', self.srf_sw_up, Pa)
         NS.write_ts('srf_sw_flux_down', self.srf_sw_down, Pa)
 
-        cdef Py_ssize_t npts = Gr.dims.nlg[2] - 2*Gr.dims.gw
-        NS.write_profile('lw_flux_up', self.lw_up[0:npts], Pa)
-        NS.write_profile('lw_flux_down', self.lw_down[0:npts], Pa)
-        NS.write_profile('sw_flux_up', self.sw_up[0:npts], Pa)
-        NS.write_profile('sw_flux_down', self.sw_down[0:npts], Pa)
-        NS.write_profile('grey_rad_heating', self.h_profile[0:npts], Pa)
-        NS.write_profile('grey_rad_dsdt', self.dsdt_profile[0:npts], Pa)
+
+        cdef Py_ssize_t npts = Gr.dims.nlg[2] - Gr.dims.gw
+        NS.write_profile('lw_flux_up', self.lw_up[Gr.dims.gw-1:npts-1], Pa)
+        NS.write_profile('lw_flux_down', self.lw_down[Gr.dims.gw-1:npts-1], Pa)
+        NS.write_profile('sw_flux_up', self.sw_up[Gr.dims.gw-1:npts-1], Pa)
+        NS.write_profile('sw_flux_down', self.sw_down[Gr.dims.gw-1:npts-1], Pa)
+        NS.write_profile('grey_rad_heating', self.h_profile[Gr.dims.gw:npts], Pa)
+        NS.write_profile('grey_rad_dsdt', self.dsdt_profile[Gr.dims.gw:npts], Pa)
 
         return
 
@@ -1470,7 +1477,10 @@ cdef double cos_sza(double jday, double hourz, double dlat, double dlon) nogil:
     return cos_sza
 
 
-def interp_pchip(z_out, z_in, v_in):
 
-    p = pchip(z_in, v_in, extrapolate=True)
-    return p(z_out)
+def interp_pchip(z_out, z_in, v_in, pchip_type=True):
+    if pchip_type:
+        p = pchip(z_in, v_in, extrapolate=True)
+        return p(z_out)
+    else:
+        return np.interp(z_out, z_in, v_in)
