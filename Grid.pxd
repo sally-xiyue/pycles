@@ -24,6 +24,26 @@ cdef extern from "grid.h":
         double [3] dx
         double [3] dxi
 
+        double zp_half_0
+        double zp_0
+
+        double * met;
+        double * met_half;
+        double * imet;
+        double * imet_half;
+
+        double * metl;
+        double * metl_half;
+        double * imetl;
+        double * imetl_half
+
+        double * dzpl_half
+        double * dzpl
+
+        double * zpl_half
+        double * zpl
+
+
 cdef class Grid:
     cdef:
         DimStruct dims
@@ -41,6 +61,27 @@ cdef class Grid:
         double [:] yl_half
         double [:] zl
         double [:] zl_half
+
+        double [:] zp
+        double [:] zp_half
+        double [:] zpl
+        double [:] zpl_half
+
+        double [:] dzp
+        double [:] dzp_half
+
+        double [:] dzpl
+        double [:] dzpl_half
+
+        double [:] met;
+        double [:] met_half;
+        double [:] imet;
+        double [:] imet_half;
+
+        double [:] metl;
+        double [:] metl_half;
+        double [:] imetl;
+        double [:] imetl_half;
 
         void compute_global_dims(self)
         void compute_local_dims(self,ParallelMPI.ParallelMPI Parallel)

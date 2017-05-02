@@ -152,14 +152,13 @@ class Simulation3d:
         #Do IO if not a restarted run
         if not self.Restart.is_restart_run:
             self.force_io()
-
         while (self.TS.t < self.TS.t_max):
             time1 = time.time()
             for self.TS.rk_step in xrange(self.TS.n_rk_steps):
                 self.Ke.update(self.Gr,PV_)
                 self.Th.update(self.Gr,self.Ref,PV_,DV_)
                 self.Micro.update(self.Gr, self.Ref, self.Th, PV_, DV_, self.TS, self.Pa)
-                self.Tr.update(self.Gr, self.Ref, PV_, DV_, self.Pa)
+                # self.Tr.update(self.Gr, self.Ref, PV_, DV_, self.Pa)
                 self.SA.update(self.Gr,self.Ref,PV_, DV_,  self.Pa)
                 self.MA.update(self.Gr,self.Ref,PV_,self.Pa)
                 self.Sur.update(self.Gr, self.Ref,self.PV, self.DV,self.Pa,self.TS)
@@ -168,11 +167,10 @@ class Simulation3d:
 
                 self.SD.update(self.Gr,self.Ref,self.PV,self.DV)
                 self.MD.update(self.Gr,self.Ref,self.PV,self.DV,self.Ke)
-
-                self.Fo.update(self.Gr, self.Ref, self.PV, self.DV, self.Pa)
+                self.Fo.update(self.Gr, self.Ref, self.PV, self.DV, self.TS, self.Pa)
                 self.Ra.update(self.Gr, self.Ref, self.PV, self.DV, self.Sur, self.TS, self.Pa)
                 self.Budg.update(self.Gr,self.Ra, self.Sur, self.TS, self.Pa)
-                self.Tr.update_cleanup(self.Gr, self.Ref, PV_, DV_, self.Pa)
+                #self.Tr.update_cleanup(self.Gr, self.Ref, PV_, DV_, self.Pa)
                 self.TS.update(self.Gr, self.PV, self.Pa)
                 PV_.Update_all_bcs(self.Gr, self.Pa)
                 self.Pr.update(self.Gr, self.Ref, self.DV, self.PV, self.Pa)
@@ -216,6 +214,7 @@ class Simulation3d:
             # If time to ouptut fields do output
             if self.FieldsIO.last_output_time + self.FieldsIO.frequency == self.TS.t:
                 self.Pa.root_print('Doing 3D FieldIO')
+                self.Th.update(self.Gr, self.Ref, self.PV, self.DV)
                 self.FieldsIO.last_output_time = self.TS.t
                 self.FieldsIO.update(self.Gr, self.PV, self.DV, self.TS, self.Pa)
                 self.FieldsIO.dump_prognostic_variables(self.Gr, self.PV)
@@ -281,17 +280,13 @@ class Simulation3d:
                 self.Restart.write(self.Pa)
                 self.Pa.root_print('Finished Dumping Restart Files!')
 
-
-
-
-
-
         return
 
     def force_io(self):
         # output stats here
 
-        self.Pa.root_print('Doing 3D FiledIO')
+        self.Pa.root_print('Doing 3D FieldIO')
+        self.Th.update(self.Gr, self.Ref, self.PV, self.DV)
         self.FieldsIO.update(self.Gr, self.PV, self.DV, self.TS, self.Pa)
         self.FieldsIO.dump_prognostic_variables(self.Gr, self.PV)
         self.FieldsIO.dump_diagnostic_variables(self.Gr, self.DV, self.Pa)

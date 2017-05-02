@@ -12,7 +12,7 @@ cimport Radiation
 cimport Surface
 from NetCDFIO cimport NetCDFIO_Stats
 import cython
-
+import cPickle
 cimport numpy as np
 import numpy as np
 include "parameters.pxi"
@@ -21,6 +21,8 @@ import cython
 
 def SurfaceBudgetFactory(namelist):
     if namelist['meta']['casename'] == 'ZGILS':
+        return SurfaceBudget(namelist)
+    elif namelist['meta']['casename'] == 'GCMFixed' or namelist['meta']['casename'] == 'GCMVarying' :
         return SurfaceBudget(namelist)
     else:
         return SurfaceBudgetNone()
@@ -40,15 +42,20 @@ cdef class SurfaceBudgetNone:
 cdef class SurfaceBudget:
     def __init__(self, namelist):
 
-        try:
-            self.constant_sst = namelist['surface_budget']['constant_sst']
-        except:
-            self.constant_sst = False
 
         try:
             self.ocean_heat_flux = namelist['surface_budget']['ocean_heat_flux']
         except:
-            self.ocean_heat_flux = 0.0
+            file=namelist['gcm']['file']
+            fh = open(file, 'r')
+            tv_input_data = cPickle.load(fh)
+            fh.close()
+
+            lat_in = tv_input_data['lat']
+            lat_idx = (np.abs(lat_in - namelist['gcm']['latitude'])).argmin()
+
+            self.ocean_heat_flux = tv_input_data['qflux'][lat_idx]
+
         try:
             self.water_depth_initial = namelist['surface_budget']['water_depth_initial']
         except:
@@ -89,8 +96,8 @@ cdef class SurfaceBudget:
             double mean_lhf = Pa.HorizontalMeanSurface(Gr, &Sur.lhf[0])
             double net_flux, tendency
 
-        if self.constant_sst:
-            return
+
+
         if TS.rk_step != 0:
             return
         if TS.t < self.fixed_sst_time:
@@ -109,8 +116,6 @@ cdef class SurfaceBudget:
             Sur.T_surface += tendency *TS.dt
 
         mpi.MPI_Bcast(&Sur.T_surface,count,mpi.MPI_DOUBLE,root, Pa.cart_comm_sub_z)
-
-
 
         return
     cpdef stats_io(self, Surface.SurfaceBase Sur, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):

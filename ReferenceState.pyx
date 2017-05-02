@@ -47,9 +47,6 @@ cdef class ReferenceState:
         :return:
         '''
 
-
-
-
         self.sg = Thermodynamics.entropy(self.Pg, self.Tg, self.qtg, 0.0, 0.0)
 
         # Form a right hand side for integrating the hydrostatic equation to
@@ -59,8 +56,8 @@ cdef class ReferenceState:
             return -g / (Rd * T * (1.0 - self.qtg + eps_vi * (self.qtg - ql - qi)))
 
         # Construct arrays for integration points
-        z = np.array(Gr.z[Gr.dims.gw - 1:-Gr.dims.gw + 1])
-        z_half = np.append([0.0], np.array(Gr.z_half[Gr.dims.gw:-Gr.dims.gw]))
+        z = np.array(Gr.zp[Gr.dims.gw - 1:-Gr.dims.gw + 1])
+        z_half = np.append([0.0], np.array(Gr.zp_half[Gr.dims.gw:-Gr.dims.gw]))
 
         # We are integrating the log pressure so need to take the log of the
         # surface pressure
@@ -85,7 +82,6 @@ cdef class ReferenceState:
 
         self.p0_global = p
         self.p0_half_global = p_half
-
 
         cdef double[:] p_ = p
         cdef double[:] p_half_ = p_half

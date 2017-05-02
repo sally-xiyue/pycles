@@ -14,7 +14,6 @@ cimport TimeStepping
 cimport Surface
 from Forcing cimport AdjustedMoistAdiabat
 from Thermodynamics cimport LatentHeat
-# import pylab as plt
 
 import numpy as np
 cimport numpy as np
@@ -26,7 +25,8 @@ include 'parameters.pxi'
 from profiles import profile_data
 # import matplotlib.pyplot as plt
 import sys
-
+from scipy.interpolate import pchip
+import cython
 
 def RadiationFactory(namelist, LatentHeat LH, ParallelMPI.ParallelMPI Pa):
     # if namelist specifies RRTM is to be used, this will override any case-specific radiation schemes
@@ -53,6 +53,8 @@ def RadiationFactory(namelist, LatentHeat LH, ParallelMPI.ParallelMPI Pa):
             return RadiationRRTM(namelist,LH, Pa)
         elif casename == 'ZGILS':
             return RadiationRRTM(namelist, LH, Pa)
+        elif casename == 'GCMFixed' or casename == 'GCMVarying':
+            return RadiationGCMGrey(namelist, LH, Pa)
         else:
             return RadiationNone()
 
@@ -200,7 +202,7 @@ cdef class RadiationDyCOMS_RF01(RadiationBase):
             double rhoi
             double dz = Gr.dims.dx[2]
             double dzi = Gr.dims.dxi[2]
-            double[:] z = Gr.z
+            double[:] z = Gr.zp
             double[:] rho = Ref.rho0
             double[:] rho_half = Ref.rho0_half
             double cbrt_z = 0
@@ -231,7 +233,7 @@ cdef class RadiationDyCOMS_RF01(RadiationBase):
                 f_rad[pi, 0] += self.f1 * exp(-q_1)
                 for k in xrange(1, Gr.dims.n[2] + 1):
                     q_1 += self.kap * \
-                        rho_half[gw + k - 1] * ql_pencils[pi, k - 1] * dz
+                        rho_half[gw + k - 1] * ql_pencils[pi, k - 1] * Gr.dims.dzpl_half[gw+k-1]
                     f_rad[pi, k] += self.f1 * exp(-q_1)
 
                 # Compute the first term on RHS of Stevens et al. 2005
@@ -239,12 +241,12 @@ cdef class RadiationDyCOMS_RF01(RadiationBase):
                 q_0 = 0.0
                 f_rad[pi, Gr.dims.n[2]] += self.f0 * exp(-q_0)
                 for k in xrange(Gr.dims.n[2] - 1, -1, -1):
-                    q_0 += self.kap * rho_half[gw + k] * ql_pencils[pi, k] * dz
+                    q_0 += self.kap * rho_half[gw + k] * ql_pencils[pi, k] *  Gr.dims.dzpl_half[gw+k]
                     f_rad[pi, k] += self.f0 * exp(-q_0)
 
                 for k in xrange(Gr.dims.n[2]):
                     f_heat[pi, k] = - \
-                       (f_rad[pi, k + 1] - f_rad[pi, k]) * dzi / rho_half[k]
+                       (f_rad[pi, k + 1] - f_rad[pi, k]) * dzi * Gr.dims.imet_half[k] / rho_half[k]
 
         # Now transpose the flux pencils
         self.z_pencil.reverse_double(&Gr.dims, Pa, f_heat, &self.heating_rate[0])
@@ -259,8 +261,8 @@ cdef class RadiationDyCOMS_RF01(RadiationBase):
                     for k in xrange(kmin, kmax):
                         ijk = ishift + jshift + k
                         PV.tendencies[
-                            s_shift + ijk] +=  self.heating_rate[ijk] / DV.values[ijk + t_shift] 
-                        self.dTdt_rad[ijk] = self.heating_rate[ijk] / cpm_c(PV.values[ijk + qt_shift]) 
+                            s_shift + ijk] +=  self.heating_rate[ijk] / DV.values[ijk + t_shift]
+                        self.dTdt_rad[ijk] = self.heating_rate[ijk] / cpm_c(PV.values[ijk + qt_shift])
 
         return
 
@@ -327,7 +329,7 @@ cdef class RadiationSmoke(RadiationBase):
             double rhoi
             double dz = Gr.dims.dx[2]
             double dzi = Gr.dims.dxi[2]
-            double[:] z = Gr.z
+            double[:] z = Gr.zp
             double[:] rho = Ref.rho0
             double[:] rho_half = Ref.rho0_half
             double cbrt_z = 0
@@ -340,12 +342,12 @@ cdef class RadiationSmoke(RadiationBase):
                 q_0 = 0.0
                 f_rad[pi, Gr.dims.n[2]] = self.f0 * exp(-q_0)
                 for k in xrange(Gr.dims.n[2] - 1, -1, -1):
-                    q_0 += self.kap * rho_half[gw + k] * smoke_pencils[pi, k] * dz
+                    q_0 += self.kap * rho_half[gw + k] * smoke_pencils[pi, k] * Gr.dims.dzpl_half[gw+k]
                     f_rad[pi, k] = self.f0 * exp(-q_0)
 
                 for k in xrange(Gr.dims.n[2]):
                     f_heat[pi, k] = - \
-                       (f_rad[pi, k + 1] - f_rad[pi, k]) * dzi / rho_half[k]
+                       (f_rad[pi, k + 1] - f_rad[pi, k]) * dzi * Gr.dims.imet_half[k] / rho_half[k]
 
         # Now transpose the flux pencils
         self.z_pencil.reverse_double(&Gr.dims, Pa, f_heat, &self.heating_rate[0])
@@ -1175,15 +1177,12 @@ cdef class RadiationRRTM(RadiationBase):
         self.srf_sw_up= Pa.domain_scalar_sum(srf_sw_up_local)
         self.srf_sw_down= Pa.domain_scalar_sum(srf_sw_down_local)
 
-
         self.uflx_lw_pencils = uflx_lw_out[:, :nz]
         self.dflx_lw_pencils = dflx_lw_out[:, :nz]
         self.uflx_sw_pencils = uflx_sw_out[:, :nz]
         self.dflx_sw_pencils = dflx_sw_out[:, :nz]
 
         self.z_pencil.reverse_double(&Gr.dims, Pa, heating_rate_pencil, &self.heating_rate[0])
-
-
 
         return
     cpdef stats_io(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, DiagnosticVariables.DiagnosticVariables DV,
@@ -1217,6 +1216,240 @@ cdef class RadiationRRTM(RadiationBase):
 
         return
 
+cdef class RadiationGCMGrey(RadiationBase):
+    def __init__(self, namelist, LatentHeat LH, ParallelMPI.ParallelMPI Pa):
+
+        # Required for surface energy budget calculations, can also be used for stats io
+        self.srf_lw_down = 0.0
+        self.srf_sw_down = 0.0
+        self.srf_lw_up = 0.0
+        self.srf_sw_up = 0.0
+
+        self.lat = namelist['gcm']['latitude']
+        self.file = str(namelist['gcm']['file'])
+
+        return
+
+    cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
+        Pa.root_print('Initializing GCM Grey Radiation')
+
+        NS.add_profile('lw_flux_up', Gr, Pa )
+        NS.add_profile('lw_flux_down', Gr, Pa)
+        NS.add_profile('sw_flux_up', Gr, Pa)
+        NS.add_profile('sw_flux_down', Gr, Pa)
+        NS.add_profile('grey_rad_heating', Gr, Pa)
+        NS.add_profile('grey_rad_dsdt', Gr, Pa)
+        import cPickle
+        tv_data_path = './forcing/f_data.pkl'
+        fh = open(tv_data_path, 'r')
+        tv_input_data = cPickle.load(fh)
+        fh.close()
+
+        lat_in = tv_input_data['lat']
+        lat_idx = (np.abs(lat_in - self.lat)).argmin()
+
+
+
+        self.lat *= pi/180.0
+        self.p_gcm = tv_input_data['p'][::-1, lat_idx]
+        self.t_gcm = tv_input_data['t'][::-1,lat_idx]
+        self.z_gcm = tv_input_data['z'][::-1,lat_idx]
+
+        RadiationBase.initialize(self, Gr, NS, Pa)
+
+        self.solar_constant = 1360.0
+        self.del_sol = 1.2
+        self.insolation = 0.25 * self.solar_constant * (1.0 + self.del_sol * (1.0 - 3.0 * sin(self.lat)**2.0)/4.0)
+
+        self.lw_tau0_pole = 1.8
+        self.lw_tau0_eqtr = 7.2
+
+        self.lw_tau_exponent = 4.0
+        self.sw_tau_exponent = 2.0
+
+        self.lw_linear_frac = 0.2
+        self.albedo_value = 0.38
+        self.atm_abs = 0.22
+        self.sw_diff = 0.20
+
+        self.odp = 1.0
+
+        self.lw_tau0 = self.lw_tau0_eqtr + (self.lw_tau0_pole - self.lw_tau0_eqtr) * sin(self.lat)**2.0 * self.odp
+        self.sw_tau0 = (1.0 - self.sw_diff * sin(self.lat)**2.0)*self.atm_abs
+
+        self.t_ref = 0.0
+
+
+
+        return
+
+    @cython.wraparound(True)
+    cpdef initialize_profiles(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, DiagnosticVariables.DiagnosticVariables DV,
+                     NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
+
+        cdef Py_ssize_t gw = Gr.dims.gw
+        cdef Py_ssize_t npg = Gr.dims.nlg[2]
+        cdef Py_ssize_t kmax = npg - gw
+
+
+
+
+
+
+
+
+        self.dp = abs(Ref.p0_half_global[kmax-1] - Ref.p0_half_global[kmax-2])
+        self.p0_les_min = np.min(Ref.p0_half_global)
+        #self.p_ext = np.arange(self.p0_les_min - self.dp, 10.0, -self.dp)
+        self.t_ext = interp_pchip(np.array(Gr.zp_half), np.array(self.z_gcm)[:], np.array(self.t_gcm)[:])
+        #self.t_ref = np.interp(Ref.p0_half_global[kmax-1],np.array(self.p_gcm)[::-1], np.array(self.t_gcm)[::-1] )
+
+        self.p_ext = interp_pchip(np.array(Gr.zp_half), np.array(self.z_gcm)[:], np.log(np.array(self.p_gcm)[:]))
+        self.n_ext_profile = self.p_ext.shape[0]
+        self.p_ext = np.exp(np.array(self.p_ext))
+
+
+        self.sw_tau = self.sw_tau0 * (np.array(self.p_ext)/101325.0)**self.sw_tau_exponent
+        self.lw_tau = self.lw_tau0 * (self.lw_linear_frac *  np.array(self.p_ext)/101325.0 +
+                                      (1.0 - self.lw_linear_frac)*(np.array(self.p_ext)/101325.0)**self.lw_tau_exponent)
+
+        self.sw_down = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.sw_up = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.lw_dtrans = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.lw_down = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.lw_up = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.net_flux = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.h_profile = np.zeros((self.n_ext_profile), dtype=np.double)
+        self.dsdt_profile = np.zeros((self.n_ext_profile), dtype=np.double)
+
+
+        return
+
+    @cython.wraparound(False)
+    cpdef update(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref,
+                 PrognosticVariables.PrognosticVariables PV, DiagnosticVariables.DiagnosticVariables DV,
+                 Surface.SurfaceBase Sur, TimeStepping.TimeStepping TS, ParallelMPI.ParallelMPI Pa):
+
+
+        #First compute mean temperature profile
+        cdef:
+            Py_ssize_t i, j, k, ijk, ishift, jshift
+
+            Py_ssize_t imin = Gr.dims.gw
+            Py_ssize_t jmin = Gr.dims.gw
+            Py_ssize_t kmin = Gr.dims.gw
+
+            Py_ssize_t imax = Gr.dims.nlg[0] - Gr.dims.gw
+            Py_ssize_t jmax = Gr.dims.nlg[1] - Gr.dims.gw
+            Py_ssize_t kmax = Gr.dims.nlg[2] - Gr.dims.gw
+
+            Py_ssize_t istride = Gr.dims.nlg[1] * Gr.dims.nlg[2]
+            Py_ssize_t jstride = Gr.dims.nlg[2]
+
+            Py_ssize_t gw = Gr.dims.gw
+
+            Py_ssize_t t_shift = DV.get_varshift(Gr, 'temperature')
+            Py_ssize_t s_shift = PV.get_varshift(Gr, 's')
+            Py_ssize_t qt_shift = PV.get_varshift(Gr, 'qt')
+            double [:] temperature_profile
+            double [:] qt_profile
+            double [:] t_extended
+            double dzi = Gr.dims.dxi[2]
+            double[:] rho_half = Ref.rho0_half
+
+            double stefan = 5.6734e-8
+
+
+        temperature_profile = Pa.HorizontalMean(Gr, &DV.values[t_shift])
+        qt_profile = Pa.HorizontalMean(Gr, &PV.values[qt_shift])
+
+        if self.t_ref == 0.0:
+            self.t_ref = temperature_profile[kmax]
+
+
+
+        #self.t_ext = np.array(self.t_ext) + (temperature_profile[kmax] - self.t_ref  )
+
+        #print self.t_ref, temperature_profile[kmax], temperature_profile[kmax] - self.t_ref, np.array(self.t_ext)
+        t_extended = self.t_ext #np.append(temperature_profile[Gr.dims.gw:Gr.dims.nlg[2]-Gr.dims.gw], self.t_ext)
+
+
+
+        #self.t_ext = np.array(self.t_ext) - (temperature_profile[kmax] - self.t_ref)
+
+
+        with nogil:
+            for k in xrange(self.n_ext_profile -1):
+                self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k])
+
+        with nogil:
+            for k in xrange(self.n_ext_profile):
+               self.sw_down[k] = self.insolation * exp(-self.sw_tau[k])
+        with nogil:
+            for k in xrange(self.n_ext_profile):
+               self.sw_up[k]  = self.sw_down[0] * self.albedo_value
+
+        self.lw_down[self.n_ext_profile-1] = 0.0
+        self.lw_dtrans[self.n_ext_profile-1] = 1.0
+        with nogil:
+            for k in xrange(self.n_ext_profile-1, 0, -1):
+                self.lw_down[k-1] = self.lw_down[k] * self.lw_dtrans[k] +  stefan * t_extended[k] **4.0 * (1.0 - self.lw_dtrans[k])
+
+        self.lw_up[0] = stefan * Sur.T_surface**4.0
+        with nogil:
+            for k in xrange(1,self.n_ext_profile):
+                self.lw_up[k] = self.lw_up[k-1] * self.lw_dtrans[k] + (stefan * t_extended[k] ** 4.0)*(1.0 - self.lw_dtrans[k])
+
+        with nogil:
+            for k in xrange(self.n_ext_profile):
+                self.net_flux[k] = (self.lw_up[k] - self.lw_down[k]) + (self.sw_up[k] - self.sw_down[k])
+
+        with nogil:
+            for k in xrange(0, kmax):
+                self.h_profile[k] =  - \
+                       (self.net_flux[k+1] - self.net_flux[k]) * dzi / rho_half[k] / cpm_c(qt_profile[k])
+        with nogil:
+            for i in xrange(imin, imax):
+                ishift = i * istride
+                for j in xrange(jmin, jmax):
+                    jshift = j * jstride
+                    for k in xrange(kmin, kmax):
+                        ijk = ishift + jshift + k
+                        PV.tendencies[s_shift + ijk] +=  -(self.net_flux[k+1-Gr.dims.gw] - self.net_flux[k-Gr.dims.gw])*dzi/DV.values[t_shift+ijk]/ rho_half[k]
+
+        cdef double [:] t_mean = Pa.HorizontalMean(Gr, &DV.values[t_shift])
+        with nogil:
+            for k in xrange(kmin, kmax):
+                self.dsdt_profile[k] = -(self.net_flux[k+1-Gr.dims.gw] - self.net_flux[k-Gr.dims.gw])*dzi/t_mean[k]/ rho_half[k]
+
+
+        self.srf_lw_up = self.lw_up[0]
+        self.srf_lw_down = self.lw_down[0]
+        self.srf_sw_up= self.sw_up[0]
+        self.srf_sw_down= self.sw_down[0]
+
+        return
+
+    cpdef stats_io(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, DiagnosticVariables.DiagnosticVariables DV,
+                   NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
+
+
+        NS.write_ts('srf_lw_flux_up',self.srf_lw_up, Pa ) # Units are W/m^2
+        NS.write_ts('srf_lw_flux_down', self.srf_lw_down, Pa)
+        NS.write_ts('srf_sw_flux_up', self.srf_sw_up, Pa)
+        NS.write_ts('srf_sw_flux_down', self.srf_sw_down, Pa)
+
+        cdef Py_ssize_t npts = Gr.dims.nlg[2] - 2*Gr.dims.gw
+        NS.write_profile('lw_flux_up', self.lw_up[0:npts], Pa)
+        NS.write_profile('lw_flux_down', self.lw_down[0:npts], Pa)
+        NS.write_profile('sw_flux_up', self.sw_up[0:npts], Pa)
+        NS.write_profile('sw_flux_down', self.sw_down[0:npts], Pa)
+        NS.write_profile('grey_rad_heating', self.h_profile[0:npts], Pa)
+        NS.write_profile('grey_rad_dsdt', self.dsdt_profile[0:npts], Pa)
+
+        return
+
+
 #Calculate cos(solar zenith angle) from radiation.f90 in JPLLES provided by Colleen
 cdef double cos_sza(double jday, double hourz, double dlat, double dlon) nogil:
 
@@ -1236,3 +1469,8 @@ cdef double cos_sza(double jday, double hourz, double dlat, double dlon) nogil:
 
     return cos_sza
 
+
+def interp_pchip(z_out, z_in, v_in):
+
+    p = pchip(z_in, v_in, extrapolate=True)
+    return p(z_out)
