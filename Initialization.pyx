@@ -18,7 +18,7 @@ from thermodynamic_functions cimport exner_c, entropy_from_thetas_c, thetas_t_c,
 cimport ReferenceState
 from Forcing cimport AdjustedMoistAdiabat
 from Thermodynamics cimport LatentHeat
-from libc.math cimport sqrt, fmin, cos, exp, fabs
+from libc.math cimport sqrt, fmin, cos, exp, fabs, fmax
 include 'parameters.pxi'
 import cPickle
 
@@ -1386,6 +1386,8 @@ def InitGCMVarying(namelist, Grid.Grid Gr,PrognosticVariables.PrognosticVariable
     #Generate initial perturbations (here we are generating more than we need)
     cdef double [:] theta_pert = np.random.random_sample(Gr.dims.npg)
 
+    cdef double qv_star_, pv_star_, ql
+
     #Now set the initial condition
     for i in xrange(Gr.dims.nlg[0]):
         ishift =  i * Gr.dims.nlg[1] * Gr.dims.nlg[2]
@@ -1396,7 +1398,10 @@ def InitGCMVarying(namelist, Grid.Grid Gr,PrognosticVariables.PrognosticVariable
                 PV.values[u_varshift + ijk] = u[k]
                 PV.values[v_varshift + ijk] = v[k]
                 PV.values[w_varshift + ijk] = 0.0
-                PV.values[s_varshift + ijk] = Th.entropy(RS.p0_half[k],t[k],qt[k],0.0,0.0)
+                pv_star_ = Th.get_pv_star(t[k])
+                qv_star_ = qv_star_c(RS.p0_half[k], qt[k], pv_star_)
+                ql = fmax(qt[k] - qv_star_, 0.0)
+                PV.values[s_varshift + ijk] = Th.entropy(RS.p0_half[k],t[k],qt[k],ql,0.0)
                 PV.values[qt_varshift + ijk] = qt[k]
                 if Gr.zpl_half[k] < 5000.0:
                     PV.values[s_varshift + ijk] = PV.values[s_varshift + ijk]  + (theta_pert[ijk] - 0.5)*0.3
