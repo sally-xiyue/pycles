@@ -127,7 +127,7 @@ cdef class Rayleigh:
 
 
         z_damp = z_top - self.tend_flat_z_d
-        z = (np.array(Gr.zp) - z_damp)/( self.tend_flat_z_d*0.15)
+        z = (np.array(Gr.zp) - z_damp)/( self.tend_flat_z_d*0.15) #0.15 can be changed to adjust the damping layer transition depth
         z_half = (np.array(Gr.zp_half) - z_damp)/( self.tend_flat_z_d*0.15)
 
         tend_flat = erf(z)

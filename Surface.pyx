@@ -1309,6 +1309,9 @@ cdef class SurfaceGCMMean(SurfaceBase):
 
 
         self.T_surface = np.mean(tv_input_data['ts'][:])
+        self.windspeed = np.zeros(Gr.dims.nlg[0]*Gr.dims.nlg[1], dtype=np.double, order='c')
+
+        NS.add_ts('surface_windspeed', Gr, Pa)
         return
 
     cpdef update(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, PrognosticVariables.PrognosticVariables PV,
@@ -1327,7 +1330,7 @@ cdef class SurfaceGCMMean(SurfaceBase):
             Py_ssize_t t_shift = DV.get_varshift(Gr, 'temperature')
             Py_ssize_t th_shift = DV.get_varshift(Gr, 'theta_rho')
             Py_ssize_t ql_shift = DV.get_varshift(Gr, 'ql')
-            double [:] windspeed = np.zeros(Gr.dims.nlg[0]*Gr.dims.nlg[1], dtype=np.double, order='c')
+            # double [:] windspeed = np.zeros(Gr.dims.nlg[0]*Gr.dims.nlg[1], dtype=np.double, order='c')
 
 
 
@@ -1336,7 +1339,7 @@ cdef class SurfaceGCMMean(SurfaceBase):
         if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
 
             self.gcm_profiles_initialized = True
-            Pa.root_print('Updating Time Varying Radiation Parameters')
+            Pa.root_print('Updating Time Mean Radiation Parameters')
 
             fh = open(self.file, 'r')
             input_data_tv = cPickle.load(fh)
@@ -1354,7 +1357,7 @@ cdef class SurfaceGCMMean(SurfaceBase):
 
 
 
-        compute_windspeed(&Gr.dims, &PV.values[u_shift], &PV.values[v_shift], &windspeed[0], Ref.u0, Ref.v0, self.gustiness)
+        compute_windspeed(&Gr.dims, &PV.values[u_shift], &PV.values[v_shift], &self.windspeed[0], Ref.u0, Ref.v0, self.gustiness)
 
 
 
@@ -1367,7 +1370,7 @@ cdef class SurfaceGCMMean(SurfaceBase):
             Py_ssize_t jstride = Gr.dims.nlg[2]
             Py_ssize_t istride_2d = Gr.dims.nlg[1]
 
-
+            double [:] windspeed = self.windspeed
             double ustar, t_flux, b_flux
             double theta_rho_b, Nb2, Ri
             double zb = Gr.dims.zp_half_0
@@ -1443,6 +1446,11 @@ cdef class SurfaceGCMMean(SurfaceBase):
 
     cpdef stats_io(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
         SurfaceBase.stats_io(self, Gr, NS, Pa)
+
+        cdef double tmp
+
+        tmp = Pa.HorizontalMeanSurface(Gr, &self.windspeed[0])
+        NS.write_ts('surface_windspeed', tmp, Pa)
 
         return
 
