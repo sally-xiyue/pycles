@@ -1679,7 +1679,7 @@ cdef class ForcingGCMMean:
         if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
             self.t_indx = int(TS.t // (3600.0 * 6.0))
             self.gcm_profiles_initialized = True
-            Pa.root_print('Updating Time Varying Forcing')
+            Pa.root_print('Updating Time Mean Forcing')
 
             fh = open(self.file, 'r')
             input_data_tv = cPickle.load(fh)
@@ -1710,7 +1710,7 @@ cdef class ForcingGCMMean:
             self.v_dt_tot = interp_pchip(Gr.zp_half, zfull, v_dt_tot)
             self.u_dt_tot = interp_pchip(Gr.zp_half, zfull, u_dt_tot)
 
-            Pa.root_print('Finished updating time varying forcing')
+            Pa.root_print('Finished updating time mean forcing')
 
             temp = interp_pchip(Gr.zp, zfull, temp)
 

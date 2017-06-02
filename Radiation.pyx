@@ -1646,7 +1646,7 @@ cdef class RadiationGCMGreyMean(RadiationBase):
         if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
 
             self.gcm_profiles_initialized = True
-            Pa.root_print('Updating Time Varying Radiation Parameters')
+            Pa.root_print('Updating Time Mean Radiation Parameters')
 
             fh = open(self.file, 'r')
             input_data_tv = cPickle.load(fh)
@@ -1672,7 +1672,7 @@ cdef class RadiationGCMGreyMean(RadiationBase):
                                           (1.0 - self.lw_linear_frac)*(np.array(self.p_ext)/101325.0)**self.lw_tau_exponent)
 
             self.t_indx = int(TS.t // (3600.0 * 6.0))
-            Pa.root_print('Finished updating time varying Radiation Parameters')
+            Pa.root_print('Finished updating time mean Radiation Parameters')
 
 
 
