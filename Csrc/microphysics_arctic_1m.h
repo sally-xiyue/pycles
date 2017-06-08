@@ -133,9 +133,9 @@ void get_rain_n0(const struct DimStruct *dims, double* restrict density, double*
                 const ssize_t ijk = ishift + jshift + k;
 
                 double rwc = fmax(qrain[ijk]*density[k], SMALL);
-                double n0_rain = 1.0e7; //b1*pow(rwc, b2);
-                double n0_max = n0_rain;//rwc*N_MAX_RAIN;
-                double n0_min = n0_rain;//rwc*N_MIN_RAIN;
+                double n0_rain = b1*pow(rwc, b2); //1.0e7;
+                double n0_max = rwc*N_MAX_RAIN; //n0_rain;
+                double n0_min = rwc*N_MIN_RAIN; //n0_rain;
 
                 nrain[ijk] = fmax(fmin(n0_rain,n0_max),n0_min);
 
@@ -170,9 +170,9 @@ void get_snow_n0(const struct DimStruct *dims, double* restrict density, double*
                 const ssize_t ijk = ishift + jshift + k;
 
                 double swc = fmax(qsnow[ijk]*density[k], SMALL);
-                double n0_snow = 1.0e7; //y1*pow(swc*1000.0, y2);
-                double n0_max = n0_snow;//swc*N_MAX_SNOW;
-                double n0_min = n0_snow;//swc*N_MIN_SNOW;
+                double n0_snow = y1*pow(swc*1000.0, y2); //1.0e7;
+                double n0_max = swc*N_MAX_SNOW; //n0_snow;
+                double n0_min = swc*N_MIN_SNOW; //n0_snow;
 
                 nsnow[ijk] = fmax(fmin(n0_snow,n0_max),n0_min);
 
