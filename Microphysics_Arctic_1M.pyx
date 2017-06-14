@@ -169,6 +169,9 @@ cdef class Microphysics_Arctic_1M:
         NS.add_ts('rwp', Gr, Pa)
         NS.add_ts('swp', Gr, Pa)
 
+        NS.add_profile('cloud_fraction_ice', Gr, Pa)
+        NS.add_profile('cloud_fraction_mixed_phase', Gr, Pa)
+
         return
 
     cpdef update(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, Th,
@@ -368,9 +371,11 @@ cdef class Microphysics_Arctic_1M:
             Py_ssize_t qi_shift = DV.get_varshift(Gr, 'qi')
             Py_ssize_t qrain_shift = PV.get_varshift(Gr, 'qrain')
             Py_ssize_t qsnow_shift = PV.get_varshift(Gr, 'qsnow')
+            Py_ssize_t ql_shift = DV.get_varshift(Gr, 'ql')
             double[:, :] qi_pencils
             double[:, :] qrain_pencils
             double[:, :] qsnow_pencils
+            double[:, :] ql_pencils
             # Cloud indicator
             double[:] ci
             double cb
@@ -394,6 +399,7 @@ cdef class Microphysics_Arctic_1M:
         qi_pencils =  z_pencil.forward_double( &Gr.dims, Pa, &DV.values[qi_shift])
         qrain_pencils =  z_pencil.forward_double( &Gr.dims, Pa, &PV.values[qrain_shift])
         qsnow_pencils =  z_pencil.forward_double( &Gr.dims, Pa, &PV.values[qsnow_shift])
+        ql_pencils =  z_pencil.forward_double( &Gr.dims, Pa, &DV.values[ql_shift])
 
 
         # Compute liquid, ice, rain, and snow water paths
@@ -427,6 +433,27 @@ cdef class Microphysics_Arctic_1M:
 
         swp_weighted_sum = Pa.domain_scalar_sum(swp_weighted_sum)
         NS.write_ts('swp', swp_weighted_sum, Pa)
+
+        # Compute cloud fraction for ice
+        with nogil:
+            for pi in xrange(z_pencil.n_local_pencils):
+                for k in xrange(kmin, kmax):
+                    if qi_pencils[pi, k] > 0.0:
+                        cf_profile[k] += 1.0 / mean_divisor
+
+        cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
+        NS.write_profile('cloud_fraction_ice', cf_profile, Pa)
+
+        # Compute mixed-phase cloud fraction
+        cf_profile = np.zeros((Gr.dims.n[2]), dtype=np.double, order='c')
+        with nogil:
+            for pi in xrange(z_pencil.n_local_pencils):
+                for k in xrange(kmin, kmax):
+                    if (ql_pencils[pi, k]+qi_pencils[pi, k]) > 0.0:
+                        cf_profile[k] += 1.0 / mean_divisor
+
+        cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
+        NS.write_profile('cloud_fraction_mixed_phase', cf_profile, Pa)
 
         return
 
