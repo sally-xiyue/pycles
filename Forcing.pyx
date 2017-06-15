@@ -1500,6 +1500,10 @@ cdef class ForcingGCMMean:
         cdef double [:] qt_tend_tmp = np.zeros(Gr.dims.npg, dtype=np.double)
         apply_subsidence(&Gr.dims, &self.rho_gcm[0], &self.rho_half_gcm[0], &self.subsidence[0], &PV.values[qt_shift], &qt_tend_tmp[0])
 
+        #Generate random perturbation
+        cdef double rand_pert = np.random.uniform(0.5, 1.5)
+
+
         with nogil:
             for i in xrange(gw,imax):
                 ishift = i * istride
@@ -1517,7 +1521,7 @@ cdef class ForcingGCMMean:
 
                         PV.tendencies[s_shift + ijk] += (cpm_c(qt) * (self.temp_dt_hadv[k] + self.temp_dt_fino[k]))/t
                         PV.tendencies[s_shift + ijk] += (sv_c(pv,t) - sd_c(pd,t)) * ( self.shum_dt_hadv[k]  + qt_tend_tmp[ijk] )
-                        PV.tendencies[qt_shift + ijk] += (self.shum_dt_hadv[k] + qt_tend_tmp[ijk])
+                        PV.tendencies[qt_shift + ijk] += (self.shum_dt_hadv[k] * rand_pert + qt_tend_tmp[ijk])
                         PV.tendencies[u_shift + ijk] += self.u_dt_tot[k]
                         PV.tendencies[v_shift + ijk] += self.v_dt_tot[k]
 
