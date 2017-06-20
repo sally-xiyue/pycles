@@ -1196,18 +1196,18 @@ cdef class ForcingGCMVarying:
             input_data_tv = cPickle.load(fh)
             fh.close()
 
-            zfull = input_data_tv['zfull'][self.t_indx,::-1]
-            alpha = input_data_tv['alpha'][self.t_indx,::-1]
-            ug = input_data_tv['u_geos'][self.t_indx,::-1]
-            vg = input_data_tv['v_geos'][self.t_indx,::-1]
-            temp_dt_hadv = input_data_tv['temp_hadv'][self.t_indx,::-1]
-            temp_dt_fino = input_data_tv['temp_fino'][self.t_indx,::-1]
-            shum_dt_hadv = input_data_tv['dt_qg_hadv'][self.t_indx,::-1]
-            v_dt_tot = input_data_tv['dt_vg_real1'][self.t_indx,::-1]
-            u_dt_tot = input_data_tv['dt_ug_real1'][self.t_indx,::-1]
-            omega = input_data_tv['omega'][self.t_indx,::-1]
+            zfull = np.mean(input_data_tv['zfull'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            alpha = np.mean(input_data_tv['alpha'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            ug = np.mean(input_data_tv['u_geos'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            vg = np.mean(input_data_tv['v_geos'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            temp_dt_hadv = np.mean(input_data_tv['temp_hadv'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            temp_dt_fino = np.mean(input_data_tv['temp_fino'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            shum_dt_hadv = np.mean(input_data_tv['dt_qg_hadv'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            v_dt_tot = np.mean(input_data_tv['dt_vg_real1'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            u_dt_tot = np.mean(input_data_tv['dt_ug_real1'][self.t_indx:self.t_indx+3,::-1],axis=0)
+            omega = np.mean(input_data_tv['omega'][self.t_indx:self.t_indx+3,::-1],axis=0)
 
-            temp = input_data_tv['temp'][self.t_indx,::-1]
+            temp = np.mean(input_data_tv['temp'][self.t_indx:self.t_indx+3,::-1],axis=0)
 
             self.ug = interp_pchip(Gr.zp_half, zfull, ug)
             self.vg = interp_pchip(Gr.zp_half, zfull, vg)
