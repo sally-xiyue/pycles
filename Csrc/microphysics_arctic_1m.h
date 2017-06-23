@@ -709,7 +709,7 @@ void entropy_source_heating_rain(const struct DimStruct *dims, double* restrict 
     const ssize_t jmax = dims->nlg[1]-dims->gw;
     const ssize_t kmax = dims->nlg[2]-dims->gw;
     const double dzi = 1.0/dims->dx[2];
-    double * imetl_half = dims -> imetl_half;
+    const double * imetl_half = dims -> imetl_half;
 
 
     for(ssize_t i=imin; i<imax; i++){
@@ -742,7 +742,7 @@ void entropy_source_heating_snow(const struct DimStruct *dims, double* restrict 
     const ssize_t jmax = dims->nlg[1]-dims->gw;
     const ssize_t kmax = dims->nlg[2]-dims->gw;
     const double dzi = 1.0/dims->dx[2];
-    double * imetl_half = dims -> imetl_half;
+    const double * imetl_half = dims -> imetl_half;
 
 
     for(ssize_t i=imin; i<imax; i++){

@@ -171,6 +171,8 @@ cdef class Microphysics_Arctic_1M:
 
         NS.add_profile('cloud_fraction_ice', Gr, Pa)
         NS.add_profile('cloud_fraction_mixed_phase', Gr, Pa)
+        NS.add_ts('cloud_fraction_ice', Gr, Pa)
+        NS.add_ts('cloud_fraction_mixed_phase', Gr, Pa)
 
         return
 
@@ -412,9 +414,9 @@ cdef class Microphysics_Arctic_1M:
                 rwp[pi] = 0.0
                 swp[pi] = 0.0
                 for k in xrange(kmin, kmax):
-                    iwp[pi] += RS.rho0_half[k] * qi_pencils[pi, k] * dz
-                    rwp[pi] += RS.rho0_half[k] * qrain_pencils[pi, k] * dz
-                    swp[pi] += RS.rho0_half[k] * qsnow_pencils[pi, k] * dz
+                    iwp[pi] += RS.rho0_half[k] * qi_pencils[pi, k] * dz * Gr.dims.met_half[k]
+                    rwp[pi] += RS.rho0_half[k] * qrain_pencils[pi, k] * dz * Gr.dims.met_half[k]
+                    swp[pi] += RS.rho0_half[k] * qsnow_pencils[pi, k] * dz * Gr.dims.met_half[k]
 
             for pi in xrange(z_pencil.n_local_pencils):
                 iwp_weighted_sum += iwp[pi]
@@ -444,6 +446,23 @@ cdef class Microphysics_Arctic_1M:
         cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
         NS.write_profile('cloud_fraction_ice', cf_profile, Pa)
 
+        # Compute all or nothing ice cloud fraction
+        ci = np.empty((z_pencil.n_local_pencils), dtype=np.double, order='c')
+        with nogil:
+            for pi in xrange(z_pencil.n_local_pencils):
+                for k in xrange(kmin, kmax):
+                    if qi_pencils[pi, k] > 0.0:
+                        ci[pi] = 1.0
+                        break
+                    else:
+                        ci[pi] = 0.0
+            for pi in xrange(z_pencil.n_local_pencils):
+                ci_weighted_sum += ci[pi]
+            ci_weighted_sum /= mean_divisor
+
+        ci_weighted_sum = Pa.domain_scalar_sum(ci_weighted_sum)
+        NS.write_ts('cloud_fraction_ice', ci_weighted_sum, Pa)
+
         # Compute mixed-phase cloud fraction
         cf_profile = np.zeros((Gr.dims.n[2]), dtype=np.double, order='c')
         with nogil:
@@ -454,6 +473,24 @@ cdef class Microphysics_Arctic_1M:
 
         cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
         NS.write_profile('cloud_fraction_mixed_phase', cf_profile, Pa)
+
+
+        # Compute all or nothing mixed-phase cloud fraction
+        ci = np.empty((z_pencil.n_local_pencils), dtype=np.double, order='c')
+        with nogil:
+            for pi in xrange(z_pencil.n_local_pencils):
+                for k in xrange(kmin, kmax):
+                    if (ql_pencils[pi, k]+qi_pencils[pi, k]) > 0.0:
+                        ci[pi] = 1.0
+                        break
+                    else:
+                        ci[pi] = 0.0
+            for pi in xrange(z_pencil.n_local_pencils):
+                ci_weighted_sum += ci[pi]
+            ci_weighted_sum /= mean_divisor
+
+        ci_weighted_sum = Pa.domain_scalar_sum(ci_weighted_sum)
+        NS.write_ts('cloud_fraction_mixed_phase', ci_weighted_sum, Pa)
 
         return
 
