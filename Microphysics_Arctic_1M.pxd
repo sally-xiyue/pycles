@@ -4,7 +4,7 @@ cimport PrognosticVariables
 cimport DiagnosticVariables
 cimport ParallelMPI
 cimport TimeStepping
-from libc.math cimport pow, fmax, fmin
+from libc.math cimport pow, fmax, fmin, exp
 include 'parameters_micro.pxi'
 from Thermodynamics cimport ClausiusClapeyron
 from NetCDFIO cimport NetCDFIO_Fields, NetCDFIO_Stats
@@ -37,6 +37,34 @@ cdef inline double lambda_Arctic(double T) nogil:
     else:
         Lambda = 0.0
 
+    return Lambda
+
+cdef inline double lambda_Hu2010(double T) nogil:
+    #Equation 1 and 2 from Hu et al. (2010)
+    cdef:
+        double p
+        double TC = T - 273.15 #Convert to Celcius
+
+    p = 5.3608 + 0.4025 * TC + 0.08387 * TC * TC + 0.007182 * TC * TC * TC + \
+        2.39e-4 * TC * TC * TC * TC + 2.87e-6 * TC * TC * TC * TC * TC
+    return 1.0 / (1.0 + exp(-p))
+
+cdef inline double lambda_logistic(double T) nogil:
+    #Cubic logistic function fitted to the Hu et al. (2009) expression
+    #(Temperature is in Kelvin)
+    cdef:
+        double k = 0.32928
+        double Tlf = 241.92
+        double Twarm = 273.15
+        double Tcold = 235.0
+        double Lambda = 0.0
+
+    if Tcold <= T <= Twarm:
+        Lambda = 1.0/pow((1.0 + exp(-k*(T - Tlf))), 3)
+    elif T > Twarm:
+        Lambda = 1.0
+    else:
+        Lambda = 0.0
     return Lambda
 
 cdef inline double latent_heat_Arctic(double T, double Lambda) nogil:
