@@ -158,9 +158,13 @@ void get_snow_n0(const struct DimStruct *dims, double* restrict density, double*
     const ssize_t jmax = dims->nlg[1];
     const ssize_t kmax = dims->nlg[2];
 
-    /*Morrison et al. 2011*/
-    const double y1 = 5.62e7;
-    const double y2 = 0.63;
+//    /*Morrison et al. 2011*/
+//    const double y1 = 5.62e7;
+//    const double y2 = 0.63;
+
+    /* Sekhon and Srivastava 1970 */
+    const double y1 = 5.994e4;
+    const double y2 = -1.105;
 
     for(ssize_t i=imin; i<imax; i++){
         const ssize_t ishift = i * istride;
