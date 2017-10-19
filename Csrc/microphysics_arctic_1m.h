@@ -206,6 +206,7 @@ void autoconversion_rain(double density, double ccn, double ql, double qrain, do
     double df = liquid_dmean(density, ql, ccn);
     double db = df*varm6;
 
+
     if(db <= 15.0e-6){
         *qrain_tendency = 0.0;
     }
@@ -426,12 +427,12 @@ void microphysics_sources(const struct DimStruct *dims, struct LookupStruct *LT,
 
     const ssize_t istride = dims->nlg[1] * dims->nlg[2];
     const ssize_t jstride = dims->nlg[2];
-    const ssize_t imin = dims->gw;
-    const ssize_t jmin = dims->gw;
-    const ssize_t kmin = dims->gw;
-    const ssize_t imax = dims->nlg[0]-dims->gw;
-    const ssize_t jmax = dims->nlg[1]-dims->gw;
-    const ssize_t kmax = dims->nlg[2]-dims->gw;
+    const ssize_t imin = 0;
+    const ssize_t jmin = 0;
+    const ssize_t kmin = 0;
+    const ssize_t imax = dims->nlg[0]-0;
+    const ssize_t jmax = dims->nlg[1]-0;
+    const ssize_t kmax = dims->nlg[2]-0;
 
     for(ssize_t i=imin; i<imax; i++){
         const ssize_t ishift = i * istride;
