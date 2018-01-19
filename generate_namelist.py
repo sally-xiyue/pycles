@@ -1376,6 +1376,10 @@ def GCMVarying():
     namelist['gcm']['lw_tau0_pole'] = 1.8
 
     namelist['surface'] = {}
+    namelist['surface']['sea_ice'] = True
+    namelist['surface']['ice_thickness'] = 1.0
+    namelist['surface']['albedo'] = 0.5
+    namelist['surface']['flux_fraction'] = 0.3
 
     namelist['radiation'] = {}
     namelist['radiation']['use_RRTM'] = False
@@ -1385,7 +1389,7 @@ def GCMVarying():
     namelist['output']['output_root'] = './'
 
     namelist['restart'] = {}
-    namelist['restart']['output'] = True
+    namelist['restart']['output'] = False
     namelist['restart']['init_from'] = False
     namelist['restart']['input_path'] = './'
     namelist['restart']['frequency'] = 600.0

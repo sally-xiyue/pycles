@@ -1282,6 +1282,13 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             Pa.root_print('lw_tau0_pole not given in namelist')
             Pa.kill()
 
+        try:
+            self.albedo_value = namelist['surface']['albedo']
+            Pa.root_print('Surface albedo set to ' + str(self.albedo_value))
+        except:
+            self.albedo_value = 0.38
+            Pa.root_print('Using default surface albedo = 0.38')
+
         return
 
     cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
@@ -1316,7 +1323,7 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
         self.sw_tau_exponent = 2.0
 
         self.lw_linear_frac = 0.2
-        self.albedo_value = 0.38
+
         self.atm_abs = 0.22
         self.sw_diff = 0.0
 
