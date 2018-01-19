@@ -1333,7 +1333,7 @@ def GCMVarying():
     namelist['mpi']['nprocz'] = 1
 
     namelist['time_stepping'] = {}
-    namelist['time_stepping']['ts_type'] = 2
+    namelist['time_stepping']['ts_type'] = 3
     namelist['time_stepping']['cfl_limit'] = 0.7
     namelist['time_stepping']['dt_initial'] = 1e-6
     namelist['time_stepping']['dt_max'] = 30.0
@@ -1367,7 +1367,7 @@ def GCMVarying():
 
     namelist['scalar_transport'] = {}
     namelist['scalar_transport']['order'] = 5
-    namelist['scalar_transport']['order_sedimentation'] = 1
+    namelist['scalar_transport']['order_sedimentation'] = 5
 
     namelist['gcm'] = {}
     namelist['gcm']['latitude'] = 80.0
@@ -1427,7 +1427,7 @@ def GCMMean():
     namelist['mpi']['nprocz'] = 1
 
     namelist['time_stepping'] = {}
-    namelist['time_stepping']['ts_type'] = 2
+    namelist['time_stepping']['ts_type'] = 3
     namelist['time_stepping']['cfl_limit'] = 0.7
     namelist['time_stepping']['dt_initial'] = 1e-6
     namelist['time_stepping']['dt_max'] = 30.0
@@ -1461,7 +1461,7 @@ def GCMMean():
 
     namelist['scalar_transport'] = {}
     namelist['scalar_transport']['order'] = 5
-    namelist['scalar_transport']['order_sedimentation'] = 1
+    namelist['scalar_transport']['order_sedimentation'] = 5
 
     namelist['gcm'] = {}
     namelist['gcm']['latitude'] = 80.0
