@@ -206,9 +206,9 @@ cdef class SurfaceBudgetVarying:
         if self.ice_thickness > 0.0:
             self.conductive_flux = (273.15 - Sur.T_surface) * 1.981 / self.ice_thickness
 
-            net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - mean_shf - mean_lhf + Ra.srf_lw_down + Ra.srf_sw_down + self.conductive_flux
-            tendency = net_flux/cl/rho_liquid/self.water_depth
-            Sur.T_surface += tendency *TS.dt
+        net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - mean_shf - mean_lhf + Ra.srf_lw_down + Ra.srf_sw_down + self.conductive_flux
+        tendency = net_flux/cl/rho_liquid/self.water_depth
+        Sur.T_surface += tendency *TS.dt
 
         mpi.MPI_Bcast(&Sur.T_surface,count,mpi.MPI_DOUBLE,root, Pa.cart_comm_sub_z)
 
