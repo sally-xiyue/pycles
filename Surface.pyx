@@ -1127,6 +1127,12 @@ cdef class SurfaceGCMVarying(SurfaceBase):
         self.CC.initialize(namelist, LH, Pa)
         self.file = str(namelist['gcm']['file'])
 
+        try:
+            self.flux_fraction = namelist['surface']['flux_fraction']
+            Pa.root_print('Surface heat flux fraction set to '+str(self.flux_fraction))
+        except:
+            self.flux_fraction = 1.0
+
         return
 
     cpdef initialize(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
@@ -1230,8 +1236,8 @@ cdef class SurfaceGCMVarying(SurfaceBase):
                     Nb2 = g/theta_rho_g*(theta_rho_b-theta_rho_g)/zb
                     Ri = Nb2 * zb * zb/(windspeed[ij] * windspeed[ij])
                     exchange_coefficients_byun(Ri, zb, self.z0, &cm[ij], &ch, &self.obukhov_length[ij])
-                    self.s_flux[ij] = -ch *windspeed[ij] * (PV.values[s_shift + ijk] - s_star)
-                    self.qt_flux[ij] = -ch *windspeed[ij] *  (PV.values[qt_shift + ijk] - qv_star)
+                    self.s_flux[ij] = -ch *windspeed[ij] * (PV.values[s_shift + ijk] - s_star) * self.flux_fraction
+                    self.qt_flux[ij] = -ch *windspeed[ij] *  (PV.values[qt_shift + ijk] - qv_star) * self.flux_fraction
                     ustar = sqrt(cm[ij]) * windspeed[ij]
                     self.friction_velocity[ij] = ustar
 
@@ -1266,8 +1272,8 @@ cdef class SurfaceGCMVarying(SurfaceBase):
                     pd = pd_c(Ref.p0_half[gw], PV.values[ijk + qt_shift], PV.values[ijk + qt_shift] - DV.values[ijk + ql_shift])
                     sv = sv_c(pv,DV.values[t_shift+ijk])
                     sd = sd_c(pd,DV.values[t_shift+ijk])
-                    self.qt_flux[ij] = self.fq / lv / 1.22
-                    self.s_flux[ij] = Ref.alpha0_half[gw] * (self.ft/DV.values[t_shift+ijk] + self.fq*(sv - sd)/lv)
+                    self.qt_flux[ij] = self.fq / lv / 1.22 * self.flux_fraction
+                    self.s_flux[ij] = Ref.alpha0_half[gw] * (self.ft/DV.values[t_shift+ijk] + self.fq*(sv - sd)/lv) * self.flux_fraction
 
         SurfaceBase.update(self, Gr, Ref, PV, DV, Pa, TS)
 

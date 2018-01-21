@@ -1379,7 +1379,7 @@ def GCMVarying():
     namelist['surface']['sea_ice'] = True
     namelist['surface']['ice_thickness'] = 1.0
     namelist['surface']['albedo'] = 0.5
-    namelist['surface']['flux_fraction'] = 0.3
+    namelist['surface']['flux_fraction'] = 0.5
 
     namelist['radiation'] = {}
     namelist['radiation']['use_RRTM'] = False
