@@ -204,7 +204,7 @@ cdef class SurfaceBudgetVarying:
                 self.water_depth = self.water_depth_initial
 
         if self.ice_thickness > 0.0:
-            self.conductive_flux = (273.15 - Sur.T_surface) * 1.981 / self.ice_thickness
+            self.conductive_flux = (271.2 - Sur.T_surface) * 1.981 / self.ice_thickness
 
         net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - mean_shf - mean_lhf + Ra.srf_lw_down + Ra.srf_sw_down + self.conductive_flux
         tendency = net_flux/cl/rho_liquid/self.water_depth
