@@ -1289,6 +1289,8 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             self.albedo_value = 0.38
             Pa.root_print('Using default surface albedo = 0.38')
 
+        self.a0 = 130.0 #LW cloud absorption coefficient
+
         return
 
     cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
@@ -1462,10 +1464,52 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
 
         #self.t_ext = np.array(self.t_ext) - (temperature_profile[kmax] - self.t_ref)
 
+        #Now calculate cloud longwave fluxes
+        cdef:
+
+            Py_ssize_t pi
+            Py_ssize_t ql_shift = DV.get_varshift(Gr, 'ql')
+            double [:, :] ql_pencils =  self.z_pencil.forward_double(& Gr.dims, Pa, & DV.values[ql_shift])
+            double dz = Gr.dims.dx[2]
+            double [:] ql_profile
+            double [:] cf_profile = np.zeros((Gr.dims.n[2]), dtype=np.double, order='c')
+            double [:] cloud_tau = np.zeros((Gr.dims.n[2]), dtype=np.double, order='c')
+            double mean_divisor = np.double(Gr.dims.n[0] * Gr.dims.n[1])
+            double [:] rho = Ref.rho0
+
+        if self.calculate_cloud_lw:
+        #Calculate domain mean profiles of ql
+        ql_profile = Pa.HorizontalMean(Gr, &DV.values[ql_shift])
+
+        # Compute cloud fraction profile
+        with nogil:
+            for pi in xrange(self.z_pencil.n_local_pencils):
+                for k in xrange(0, Gr.dims.n[2]):
+                    if ql_pencils[pi, k] > 0.0:
+                        cf_profile[k] += 1.0 / mean_divisor
+
+        cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
+
+
+        #Calculate cloud optical depth
+        with nogil:
+            for k in xrange(Gr.dims.n[2]):
+                # tau_cloud[pi, k] = -self.a0 * ql_pencils[pi, k] * (p_half[k] - p_half[k+1]) / g
+                cloud_tau[k] = fmax(self.a0 * ql_profile[k] * rho[k] * dz, 0.0)
+
 
         with nogil:
-            for k in xrange(self.n_ext_profile -1):
-                self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k])
+            for k in xrange(self.n_ext_profile - 1):
+                if cf_profile[k] > 0.00001:
+                    self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k]) * \
+                                    (cf_profile[k] * exp(cloud_tau[k] / cf_profile[k]) + (1.0 - cf_profile[k]))
+                else:
+                    self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k])
+
+        #
+        # with nogil:
+        #     for k in xrange(self.n_ext_profile -1):
+        #         self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k])
 
 
         with nogil:
@@ -1823,3 +1867,68 @@ def interp_pchip(z_out, z_in, v_in, pchip_type=True):
         return p(z_out)
     else:
         return np.interp(z_out, z_in, v_in)
+
+# cpdef calculate_cloud_longwave(Grid.Grid Gr, ):
+#
+#     cdef:
+#         Py_ssize_t imin = Gr.dims.gw
+#         Py_ssize_t jmin = Gr.dims.gw
+#         Py_ssize_t kmin = Gr.dims.gw
+#
+#         Py_ssize_t imax = Gr.dims.nlg[0] - Gr.dims.gw
+#         Py_ssize_t jmax = Gr.dims.nlg[1] - Gr.dims.gw
+#         Py_ssize_t kmax = Gr.dims.nlg[2] - Gr.dims.gw
+#
+#         Py_ssize_t pi, i, j, k, ijk, ishift, jshift
+#         Py_ssize_t istride = Gr.dims.nlg[1] * Gr.dims.nlg[2]
+#         Py_ssize_t jstride = Gr.dims.nlg[2]
+#         Py_ssize_t ql_shift = DV.get_varshift(Gr, 'ql')
+#         Py_ssize_t qt_shift = PV.get_varshift(Gr, 'qt')
+#         Py_ssize_t s_shift = PV.get_varshift(Gr, 's')
+#         Py_ssize_t t_shift = DV.get_varshift(Gr, 'temperature')
+#         Py_ssize_t gw = Gr.dims.gw
+#         double [:, :] ql_pencils =  self.z_pencil.forward_double(& Gr.dims, Pa, & DV.values[ql_shift])
+#         double [:, :] qt_pencils =  self.z_pencil.forward_double(& Gr.dims, Pa, & PV.values[qt_shift])
+#         double [:, :] f_rad = np.zeros((self.z_pencil.n_local_pencils, Gr.dims.n[2] + 1), dtype=np.double, order='c')
+#         double [:, :] f_heat = np.zeros((self.z_pencil.n_local_pencils, Gr.dims.n[2]), dtype=np.double, order='c')
+#         double [:] heating_rate = self.heating_rate[:]
+#         double [:] radiative_flux = self.radiative_flux[:]
+#         double q_0
+#         double q_1
+#
+#         double dz = Gr.dims.dx[2]
+#         double dzi = Gr.dims.dxi[2]
+#         double[:] z = Gr.z
+#         double[:] rho = Ref.rho0
+#         double[:] rho_half = Ref.rho0_half
+#
+#
+#     with nogil:
+#         for pi in xrange(self.z_pencil.n_local_pencils):
+#
+#             # Compute the second term on RHS of Stevens et al. 2005
+#             # (equation 3)
+#             q_1 = 0.0
+#             f_rad[pi, 0] += self.f1 * exp(-q_1)
+#             for k in xrange(1, Gr.dims.n[2] + 1):
+#                 q_1 += self.kap * \
+#                         rho_half[gw + k - 1] * ql_pencils[pi, k - 1] * dz
+#                 f_rad[pi, k] += self.f1 * exp(-q_1)
+#
+#             # Compute the first term on RHS of Stevens et al. 2005
+#            # (equation 3)
+#             q_0 = 0.0
+#             f_rad[pi, Gr.dims.n[2]] += self.f0 * exp(-q_0)
+#             for k in xrange(Gr.dims.n[2] - 1, -1, -1):
+#                 q_0 += self.kap * rho_half[gw + k] * ql_pencils[pi, k] * dz
+#                 f_rad[pi, k] += self.f0 * exp(-q_0)
+#
+#             for k in xrange(Gr.dims.n[2]):
+#                 f_heat[pi, k] = - \
+#                     (f_rad[pi, k + 1] - f_rad[pi, k]) * dzi / rho_half[k]
+#
+#     # Now transpose the flux pencils
+#     self.z_pencil.reverse_double(& Gr.dims, Pa, f_heat, & heating_rate[0])
+#     self.z_pencil.reverse_double(& Gr.dims, Pa, f_rad[:,:-1], & radiative_flux[0])
+#
+#     return
