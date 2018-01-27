@@ -1289,7 +1289,20 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             self.albedo_value = 0.38
             Pa.root_print('Using default surface albedo = 0.38')
 
-        self.a0 = 130.0 #LW cloud absorption coefficient
+
+        try:
+            self.a0 = namelist['gcm']['cloud_absorption_coeff']
+            Pa.root_print('Cloud absorption coefficient set to ' + str(self.a0))
+        except:
+            self.a0 = 130.0 #LW cloud absorption coefficient
+
+        try:
+            self.calculate_cloud_lw = namelist['gcm']['calculate_cloud_lw']
+            if self.calculate_cloud_lw:
+                Pa.root_print('Calculate cloud longwave effect in grey radiation!')
+        except:
+            self.calculate_cloud_lw = False
+
 
         return
 
@@ -1478,24 +1491,24 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             double [:] rho = Ref.rho0
 
         if self.calculate_cloud_lw:
-        #Calculate domain mean profiles of ql
-        ql_profile = Pa.HorizontalMean(Gr, &DV.values[ql_shift])
+            #Calculate domain mean profiles of ql
+            ql_profile = Pa.HorizontalMean(Gr, &DV.values[ql_shift])
 
-        # Compute cloud fraction profile
-        with nogil:
-            for pi in xrange(self.z_pencil.n_local_pencils):
-                for k in xrange(0, Gr.dims.n[2]):
-                    if ql_pencils[pi, k] > 0.0:
-                        cf_profile[k] += 1.0 / mean_divisor
+            # Compute cloud fraction profile
+            with nogil:
+                for pi in xrange(self.z_pencil.n_local_pencils):
+                    for k in xrange(0, Gr.dims.n[2]):
+                        if ql_pencils[pi, k] > 0.0:
+                            cf_profile[k] += 1.0 / mean_divisor
 
-        cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
+            cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
 
 
-        #Calculate cloud optical depth
-        with nogil:
-            for k in xrange(Gr.dims.n[2]):
-                # tau_cloud[pi, k] = -self.a0 * ql_pencils[pi, k] * (p_half[k] - p_half[k+1]) / g
-                cloud_tau[k] = fmax(self.a0 * ql_profile[k] * rho[k] * dz, 0.0)
+            #Calculate cloud optical depth
+            with nogil:
+                for k in xrange(Gr.dims.n[2]):
+                    # tau_cloud[pi, k] = -self.a0 * ql_pencils[pi, k] * (p_half[k] - p_half[k+1]) / g
+                    cloud_tau[k] = fmax(self.a0 * ql_profile[k] * rho[k] * dz, 0.0)
 
 
         with nogil:

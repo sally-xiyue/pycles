@@ -1374,6 +1374,7 @@ def GCMVarying():
     namelist['gcm']['file'] = './forcing/f_data_tv_90.pkl'
     namelist['gcm']['lw_tau0_eqtr'] = 7.2
     namelist['gcm']['lw_tau0_pole'] = 1.8
+    namelist['gcm']['calculate_cloud_lw'] = True
 
     namelist['surface'] = {}
     namelist['surface']['sea_ice'] = True

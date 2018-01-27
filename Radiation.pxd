@@ -241,6 +241,7 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
         double dp
 
         double a0
+        bint calculate_cloud_lw
 
     cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa)
     cpdef initialize_profiles(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, DiagnosticVariables.DiagnosticVariables DV,
