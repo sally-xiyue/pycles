@@ -1485,8 +1485,8 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             double [:, :] ql_pencils =  self.z_pencil.forward_double(& Gr.dims, Pa, & DV.values[ql_shift])
             double dz = Gr.dims.dx[2]
             double [:] ql_profile
-            double [:] cf_profile = np.zeros((Gr.dims.n[2]), dtype=np.double, order='c')
-            double [:] cloud_tau = np.zeros((Gr.dims.n[2]), dtype=np.double, order='c')
+            double [:] cf_profile = np.zeros((Gr.dims.n[2]+2*gw), dtype=np.double, order='c')
+            double [:] cloud_tau = np.zeros((Gr.dims.n[2]+2*gw), dtype=np.double, order='c')
             double mean_divisor = np.double(Gr.dims.n[0] * Gr.dims.n[1])
             double [:] rho = Ref.rho0
 
@@ -1499,14 +1499,13 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
                 for pi in xrange(self.z_pencil.n_local_pencils):
                     for k in xrange(0, Gr.dims.n[2]):
                         if ql_pencils[pi, k] > 0.0:
-                            cf_profile[k] += 1.0 / mean_divisor
+                            cf_profile[k+gw] += 1.0 / mean_divisor
 
-            cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2])
-
+            cf_profile = Pa.domain_vector_sum(cf_profile, Gr.dims.n[2]+2*gw)
 
             #Calculate cloud optical depth
             with nogil:
-                for k in xrange(Gr.dims.n[2]):
+                for k in xrange(self.n_ext_profile):
                     # tau_cloud[pi, k] = -self.a0 * ql_pencils[pi, k] * (p_half[k] - p_half[k+1]) / g
                     cloud_tau[k] = fmax(self.a0 * ql_profile[k] * rho[k] * dz, 0.0)
 
