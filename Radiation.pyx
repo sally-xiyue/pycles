@@ -1505,16 +1505,17 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
 
             #Calculate cloud optical depth
             with nogil:
-                for k in xrange(self.n_ext_profile):
+                for k in xrange(self.n_ext_profile-1):
                     # tau_cloud[pi, k] = -self.a0 * ql_pencils[pi, k] * (p_half[k] - p_half[k+1]) / g
-                    cloud_tau[k] = fmax(self.a0 * ql_profile[k] * rho[k] * dz, 0.0)
+                    # cloud_tau[k] = fmax(self.a0 * ql_profile[k] * rho[k] * dz, 0.0)
+                    cloud_tau[k] = fmax(-self.a0 * ql_profile[k] * (self.p_ext[k+1] - self.p_ext[k])/g, 0.0)
 
 
         with nogil:
             for k in xrange(self.n_ext_profile - 1):
                 if cf_profile[k] > 0.00001:
                     self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k]) * \
-                                    (cf_profile[k] * exp(cloud_tau[k] / cf_profile[k]) + (1.0 - cf_profile[k]))
+                                    (cf_profile[k] * exp(-cloud_tau[k] / cf_profile[k]) + (1.0 - cf_profile[k]))
                 else:
                     self.lw_dtrans[k] = exp(self.lw_tau[k+1] - self.lw_tau[k])
 
