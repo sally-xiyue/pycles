@@ -1376,6 +1376,7 @@ def GCMVarying():
     namelist['gcm']['lw_tau0_pole'] = 1.8
 
     namelist['surface'] = {}
+    namelist['surface']['gcm_flux'] = True
 
     namelist['radiation'] = {}
     namelist['radiation']['use_RRTM'] = False
