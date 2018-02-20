@@ -408,7 +408,7 @@ void microphysics_sources(const struct DimStruct *dims, struct LookupStruct *LT,
                              double* restrict qsnow, double* restrict nsnow, double dt,
                              double* restrict qrain_tendency_micro, double* restrict qrain_tendency,
                              double* restrict qsnow_tendency_micro, double* restrict qsnow_tendency,
-                             double* restrict precip_rate, double* restrict evap_rate){
+                             double* restrict precip_rate, double* restrict evap_rate, double* restrict melt_rate){
 
     const double b1 = 650.1466922699631;
     const double b2 = -1.222222222222222;
@@ -452,6 +452,7 @@ void microphysics_sources(const struct DimStruct *dims, struct LookupStruct *LT,
 
                 precip_rate[ijk] = 0.0;
                 evap_rate[ijk] = 0.0;
+                melt_rate[ijk] = 0.0;
 
                 // Now do sub-timestepping
                 double time_added = 0.0, dt_, rate;
@@ -514,6 +515,7 @@ void microphysics_sources(const struct DimStruct *dims, struct LookupStruct *LT,
 
                     precip_rate[ijk] += precip_tmp;
                     evap_rate[ijk] += evap_tmp;
+                    melt_rate[ijk] += qsnow_tendency_melt; // NEGATIVE if snow melts to rain
 
                     //Integrate forward in time
                     ql_tmp += ql_tendency_tmp * dt_;

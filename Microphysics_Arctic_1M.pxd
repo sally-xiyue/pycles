@@ -99,6 +99,7 @@ cdef class Microphysics_Arctic_1M:
 
         double [:] evap_rate
         double [:] precip_rate
+        double [:] melt_rate
 
 
     cpdef initialize(self, Grid.Grid Gr, PrognosticVariables.PrognosticVariables PV, DiagnosticVariables.DiagnosticVariables DV,
