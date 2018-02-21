@@ -513,9 +513,9 @@ void microphysics_sources(const struct DimStruct *dims, struct LookupStruct *LT,
                     precip_tmp = -qrain_tendency_aut + ql_tendency_acc - qsnow_tendency_aut + qi_tendency_acc;
                     evap_tmp = qrain_tendency_evp + qsnow_tendency_evp;
 
-                    precip_rate[ijk] += precip_tmp;
-                    evap_rate[ijk] += evap_tmp;
-                    melt_rate[ijk] += qsnow_tendency_melt; // NEGATIVE if snow melts to rain
+                    precip_rate[ijk] += precip_tmp * dt_;
+                    evap_rate[ijk] += evap_tmp * dt_;
+                    melt_rate[ijk] += qsnow_tendency_melt * dt_; // NEGATIVE if snow melts to rain
 
                     //Integrate forward in time
                     ql_tmp += ql_tendency_tmp * dt_;
@@ -537,6 +537,10 @@ void microphysics_sources(const struct DimStruct *dims, struct LookupStruct *LT,
                 qrain_tendency[ijk] += qrain_tendency_micro[ijk];
                 qsnow_tendency_micro[ijk] = (qsnow_tmp - qsnow[ijk])/dt;
                 qsnow_tendency[ijk] += qsnow_tendency_micro[ijk];
+
+                precip_rate[ijk] = precip_rate[ijk]/dt;
+                evap_rate[ijk] = evap_rate[ijk]/dt;
+                melt_rate[ijk] = melt_rate[ijk]/dt;
 
             }
         }
