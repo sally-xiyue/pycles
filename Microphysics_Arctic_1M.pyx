@@ -24,10 +24,6 @@ cimport ParallelMPI
 from libc.math cimport fmax, fmin, fabs
 
 cdef extern from "microphysics_arctic_1m.h":
-    inline double entropy_src_precipitation_c(double p0, double T, double qt, double qv,
-                                              double L, double precip_rate) nogil
-    inline double entropy_src_evaporation_c(double p0, double T, double Tw, double qt, double qv,
-                                            double L, double evap_rate) nogil
     void sedimentation_velocity_rain(Grid.DimStruct *dims, double* density, double* nrain, double* qrain,
                                      double* qrain_velocity) nogil
     void sedimentation_velocity_snow(Grid.DimStruct *dims, double* density, double* nsnow, double* qsnow,
@@ -67,6 +63,13 @@ cdef extern from "microphysics_arctic_1m.h":
                                   double* qt, double* qrain, double* nrain, double* qrain_tendency) nogil
     void get_rain_n0(Grid.DimStruct *dims, double* density, double* qrain, double* nrain) nogil
     void get_snow_n0(Grid.DimStruct *dims, double* density, double* qsnow, double* nsnow) nogil
+    void entropy_source_evaporation(Grid.DimStruct *dims, Lookup.LookupStruct *LT, double (*lam_fp)(double),
+                                    double (*L_fp)(double, double), double* p0, double* temperature,
+                                    double* Twet, double* qt, double* qv, double* evap_rate, double* entropy_tendency)
+    void entropy_source_precipitation(Grid.DimStruct *dims, Lookup.LookupStruct *LT, double (*lam_fp)(double),
+                                      double (*L_fp)(double, double), double* p0, double* temperature,
+                                      double* qt, double* qv, double* precip_rate, double* entropy_tendency)
+    void entropy_source_melt(Grid.DimStruct *dims, double* temperature, double* melt_rate, double* entropy_tendency)
 
 
 cdef extern from "microphysics.h":
@@ -240,16 +243,19 @@ cdef class Microphysics_Arctic_1M:
 
         qt_source_formation(&Gr.dims, &PV.tendencies[qt_shift], &self.precip_rate[0], &self.evap_rate[0])
 
-        # #Add entropy tendency due to microphysics (precipitation and evaporation only)
+        #Entropy tendencies due to microphysics
         microphysics_wetbulb_temperature(&Gr.dims, &self.CC.LT.LookupStructC, &Ref.p0_half[0], &PV.values[s_shift],
                                           &PV.values[qt_shift], &DV.values[t_shift], &DV.values[tw_shift])
-        #
-        get_s_source_precip(&Gr.dims, Th, &Ref.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift], &DV.values[qv_shift],
-                             &self.precip_rate[0], &PV.tendencies[s_shift])
-        get_s_source_evap(&Gr.dims, Th, &Ref.p0_half[0], &DV.values[t_shift], &DV.values[tw_shift], &PV.values[qt_shift], &DV.values[qv_shift],
-                             &self.evap_rate[0], &PV.tendencies[s_shift])
 
-        get_s_source_melt(&Gr.dims, Th, &DV.values[t_shift], &self.melt_rate[0], &PV.tendencies[s_shift])
+        entropy_source_precipitation(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &Ref.p0_half[0],
+                                     &DV.values[t_shift], &PV.values[qt_shift], &DV.values[qv_shift],
+                                     &self.precip_rate[0], &PV.tendencies[s_shift])
+
+        entropy_source_evaporation(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &Ref.p0_half[0],
+                                   &DV.values[t_shift], &DV.values[tw_shift], &PV.values[qt_shift],
+                                   &DV.values[qv_shift], &self.evap_rate[0], &PV.tendencies[s_shift])
+
+        entropy_source_melt(&Gr.dims, &DV.values[t_shift], &self.melt_rate[0], &PV.tendencies[s_shift])
 
         #
         entropy_source_heating_rain(&Gr.dims, &DV.values[t_shift], &DV.values[tw_shift], &PV.values[qrain_shift],
@@ -268,7 +274,7 @@ cdef class Microphysics_Arctic_1M:
 
         return
 
-    cpdef stats_io(self, Grid.Grid Gr, ReferenceState.ReferenceState RS, Th, PrognosticVariables.PrognosticVariables PV,
+    cpdef stats_io(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, Th, PrognosticVariables.PrognosticVariables PV,
                    DiagnosticVariables.DiagnosticVariables DV, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
         cdef:
             Py_ssize_t qt_shift = PV.get_varshift(Gr, 'qt')
@@ -301,34 +307,34 @@ cdef class Microphysics_Arctic_1M:
         tmp = Pa.HorizontalMean(Gr, &self.melt_rate[0])
         NS.write_profile('melt_rate', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
-        autoconversion_rain_wrapper(&Gr.dims, &RS.rho0_half[0], self.ccn, &DV.values[ql_shift], &PV.values[qrain_shift],
+        autoconversion_rain_wrapper(&Gr.dims, &Ref.rho0_half[0], self.ccn, &DV.values[ql_shift], &PV.values[qrain_shift],
                                      &DV.values[nrain_shift], &dummy[0])
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('rain_auto_mass', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         dummy[:] = 0.0
         autoconversion_snow_wrapper(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, self.n0_ice_input,
-                                    &RS.rho0_half[0], &RS.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift],
+                                    &Ref.rho0_half[0], &Ref.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift],
                                     &DV.values[qi_shift], &dummy[0])
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('snow_auto_mass', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         dummy[:] = 0.0
-        evaporation_rain_wrapper(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &RS.rho0_half[0],
-                                 &RS.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift], &PV.values[qrain_shift],
+        evaporation_rain_wrapper(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &Ref.rho0_half[0],
+                                 &Ref.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift], &PV.values[qrain_shift],
                                  &DV.values[nrain_shift], &dummy[0])
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('rain_evap_mass', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         dummy[:] = 0.0
-        evaporation_snow_wrapper(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &RS.rho0_half[0],
-                                 &RS.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift], &PV.values[qsnow_shift],
+        evaporation_snow_wrapper(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &Ref.rho0_half[0],
+                                 &Ref.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift], &PV.values[qsnow_shift],
                                  &DV.values[nsnow_shift], &dummy[0])
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('snow_depo_mass', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         dummy[:] = 0.0
-        accretion_all_wrapper(&Gr.dims, &RS.rho0_half[0], &RS.p0_half[0], &DV.values[t_shift], self.n0_ice_input, self.ccn,
+        accretion_all_wrapper(&Gr.dims, &Ref.rho0_half[0], &Ref.p0_half[0], &DV.values[t_shift], self.n0_ice_input, self.ccn,
                               &DV.values[ql_shift], &DV.values[qi_shift], &PV.values[qrain_shift], &DV.values[nrain_shift],
                               &PV.values[qsnow_shift], &DV.values[nsnow_shift], &dummy2[0], &dummy3[0],
                               &dummy4[0], &dummy[0])
@@ -339,24 +345,24 @@ cdef class Microphysics_Arctic_1M:
         NS.write_profile('rain_accr_mass', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         dummy[:] = 0.0
-        melt_snow_wrapper(&Gr.dims, &RS.rho0_half[0], &DV.values[t_shift], &PV.values[qsnow_shift],
+        melt_snow_wrapper(&Gr.dims, &Ref.rho0_half[0], &DV.values[t_shift], &PV.values[qsnow_shift],
                           &DV.values[nsnow_shift], &dummy[0])
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('snow_melt_mass', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
 
         #compute sedimentation flux only of qrain and qsnow
-        compute_advective_fluxes_a(&Gr.dims, &RS.rho0[0], &RS.rho0_half[0], &DV.values[wqrain_shift],
+        compute_advective_fluxes_a(&Gr.dims, &Ref.rho0[0], &Ref.rho0_half[0], &DV.values[wqrain_shift],
                                    &PV.values[qrain_shift], &dummy[0], 2, self.order)
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('rain_sedimentation_flux', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
-        compute_advective_fluxes_a(&Gr.dims, &RS.rho0[0], &RS.rho0_half[0], &DV.values[wqsnow_shift],
+        compute_advective_fluxes_a(&Gr.dims, &Ref.rho0[0], &Ref.rho0_half[0], &DV.values[wqsnow_shift],
                                    &PV.values[qsnow_shift], &dummy[0], 2, self.order)
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('snow_sedimentation_flux', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
-        get_virtual_potential_temperature(&Gr.dims, &RS.p0_half[0], &DV.values[t_shift], &DV.values[qv_shift],
+        get_virtual_potential_temperature(&Gr.dims, &Ref.p0_half[0], &DV.values[t_shift], &DV.values[qv_shift],
                                           &DV.values[ql_shift], &DV.values[qi_shift], &dummy[0])
         tmp = Pa.HorizontalMean(Gr, &dummy[0])
         NS.write_profile('thetav_mean', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
@@ -366,27 +372,29 @@ cdef class Microphysics_Arctic_1M:
 
         #Output entropy source terms due to microphysics
 
-        get_s_source_precip(&Gr.dims, Th, &RS.p0_half[0], &DV.values[t_shift], &PV.values[qt_shift], &DV.values[qv_shift],
-                            &self.precip_rate[0], &tmp_tendency[0])
+        entropy_source_precipitation(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &Ref.p0_half[0],
+                                     &DV.values[t_shift], &PV.values[qt_shift], &DV.values[qv_shift],
+                                     &self.precip_rate[0], &tmp_tendency[0])
         tmp = Pa.HorizontalMean(Gr, &tmp_tendency[0])
         NS.write_profile('micro_s_source_precipitation', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         tmp_tendency[:] = 0.0
-        get_s_source_evap(&Gr.dims, Th, &RS.p0_half[0], &DV.values[t_shift], &DV.values[tw_shift],&PV.values[qt_shift], &DV.values[qv_shift],
-                            &self.evap_rate[0], &tmp_tendency[0])
+        entropy_source_evaporation(&Gr.dims, &self.CC.LT.LookupStructC, self.Lambda_fp, self.L_fp, &Ref.p0_half[0],
+                                   &DV.values[t_shift], &DV.values[tw_shift], &PV.values[qt_shift],
+                                   &DV.values[qv_shift], &self.evap_rate[0], &tmp_tendency[0])
         tmp = Pa.HorizontalMean(Gr, &tmp_tendency[0])
         NS.write_profile('micro_s_source_evaporation', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
         tmp_tendency[:] = 0.0
-        get_s_source_melt(&Gr.dims, Th, &DV.values[t_shift], &self.melt_rate[0], &tmp_tendency[0])
+        entropy_source_melt(&Gr.dims, &DV.values[t_shift], &self.melt_rate[0], &tmp_tendency[0])
         tmp = Pa.HorizontalMean(Gr, &tmp_tendency[0])
         NS.write_profile('micro_s_source_melt', tmp[Gr.dims.gw:-Gr.dims.gw], Pa)
 
-        self.ice_stats(Gr, RS, PV, DV, NS, Pa)
+        self.ice_stats(Gr, Ref, PV, DV, NS, Pa)
 
         return
 
-    cpdef ice_stats(self, Grid.Grid Gr, ReferenceState.ReferenceState RS, PrognosticVariables.PrognosticVariables PV,
+    cpdef ice_stats(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, PrognosticVariables.PrognosticVariables PV,
                     DiagnosticVariables.DiagnosticVariables DV, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
 
         cdef:
@@ -439,9 +447,9 @@ cdef class Microphysics_Arctic_1M:
                 rwp[pi] = 0.0
                 swp[pi] = 0.0
                 for k in xrange(kmin, kmax):
-                    iwp[pi] += RS.rho0_half[k] * qi_pencils[pi, k] * dz * Gr.dims.met_half[k]
-                    rwp[pi] += RS.rho0_half[k] * qrain_pencils[pi, k] * dz * Gr.dims.met_half[k]
-                    swp[pi] += RS.rho0_half[k] * qsnow_pencils[pi, k] * dz * Gr.dims.met_half[k]
+                    iwp[pi] += Ref.rho0_half[k] * qi_pencils[pi, k] * dz * Gr.dims.met_half[k]
+                    rwp[pi] += Ref.rho0_half[k] * qrain_pencils[pi, k] * dz * Gr.dims.met_half[k]
+                    swp[pi] += Ref.rho0_half[k] * qsnow_pencils[pi, k] * dz * Gr.dims.met_half[k]
 
             for pi in xrange(z_pencil.n_local_pencils):
                 iwp_weighted_sum += iwp[pi]
@@ -518,75 +526,3 @@ cdef class Microphysics_Arctic_1M:
         NS.write_ts('cloud_fraction_mixed_phase', ci_weighted_sum, Pa)
 
         return
-
-cdef get_s_source_precip(Grid.DimStruct *dims, Th, double *p0_half, double *t, double *qt, double *qv, double *precip_rate, double *s_tendency):
-    cdef:
-        Py_ssize_t imin = dims.gw
-        Py_ssize_t jmin = dims.gw
-        Py_ssize_t kmin = dims.gw
-        Py_ssize_t imax = dims.nlg[0] -dims.gw
-        Py_ssize_t jmax = dims.nlg[1] -dims.gw
-        Py_ssize_t kmax = dims.nlg[2] -dims.gw
-        Py_ssize_t istride = dims.nlg[1] * dims.nlg[2]
-        Py_ssize_t jstride = dims.nlg[2]
-        Py_ssize_t ishift, jshift, ijk, i,j,k
-        double L
-
-    for i in xrange(imin,imax):
-        ishift = i * istride
-        for j in xrange(jmin,jmax):
-            jshift = j * jstride
-            for k in xrange(kmin,kmax):
-                ijk = ishift + jshift + k
-                L = Th.get_lh(t[ijk])
-                s_tendency[ijk] += entropy_src_precipitation_c(p0_half[k], t[ijk], qt[ijk], qv[ijk], L, precip_rate[ijk])
-
-    return
-
-cdef get_s_source_evap(Grid.DimStruct *dims, Th, double *p0_half, double *t, double *tw, double *qt, double *qv, double *evap_rate, double *s_tendency):
-    cdef:
-        Py_ssize_t imin = dims.gw
-        Py_ssize_t jmin = dims.gw
-        Py_ssize_t kmin = dims.gw
-        Py_ssize_t imax = dims.nlg[0] -dims.gw
-        Py_ssize_t jmax = dims.nlg[1] -dims.gw
-        Py_ssize_t kmax = dims.nlg[2] -dims.gw
-        Py_ssize_t istride = dims.nlg[1] * dims.nlg[2]
-        Py_ssize_t jstride = dims.nlg[2]
-        Py_ssize_t ishift, jshift, ijk, i,j,k
-        double L
-
-    for i in xrange(imin,imax):
-        ishift = i * istride
-        for j in xrange(jmin,jmax):
-            jshift = j * jstride
-            for k in xrange(kmin,kmax):
-                ijk = ishift + jshift + k
-                L = Th.get_lh(t[ijk])
-                s_tendency[ijk] += entropy_src_evaporation_c(p0_half[k], t[ijk], tw[ijk], qt[ijk], qv[ijk], L, evap_rate[ijk])
-
-    return
-
-cdef get_s_source_melt(Grid.DimStruct *dims, Th, double *t, double *melt_rate, double *s_tendency):
-    cdef:
-        Py_ssize_t imin = dims.gw
-        Py_ssize_t jmin = dims.gw
-        Py_ssize_t kmin = dims.gw
-        Py_ssize_t imax = dims.nlg[0] -dims.gw
-        Py_ssize_t jmax = dims.nlg[1] -dims.gw
-        Py_ssize_t kmax = dims.nlg[2] -dims.gw
-        Py_ssize_t istride = dims.nlg[1] * dims.nlg[2]
-        Py_ssize_t jstride = dims.nlg[2]
-        Py_ssize_t ishift, jshift, ijk, i,j,k
-        double L
-
-    for i in xrange(imin,imax):
-        ishift = i * istride
-        for j in xrange(jmin,jmax):
-            jshift = j * jstride
-            for k in xrange(kmin,kmax):
-                ijk = ishift + jshift + k
-                L = Th.get_lh(t[ijk])
-                s_tendency[ijk] += melt_rate[ijk] * L / t[ijk]
-
-    return
