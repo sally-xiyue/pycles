@@ -128,19 +128,24 @@ cdef class SurfaceBudget:
 cdef class SurfaceBudgetVarying:
     def __init__(self, namelist):
 
+        try:
+            self.file=str(namelist['gcm']['file'])
+        except:
+            self.file = None
 
         try:
             self.ocean_heat_flux = namelist['surface_budget']['ocean_heat_flux']
         except:
-            file=namelist['gcm']['file']
-            fh = open(file, 'r')
-            tv_input_data = cPickle.load(fh)
-            fh.close()
+            try:
+                fh = open(self.file, 'r')
+                tv_input_data = cPickle.load(fh)
+                fh.close()
 
-
-            self.ocean_heat_flux = tv_input_data['qflux'][0]
-            print 'Ocean heat flux set to: ', self.ocean_heat_flux
-
+                self.ocean_heat_flux = tv_input_data['qflux'][0]
+                print 'Ocean heat flux set to: ', self.ocean_heat_flux
+            except:
+                print('No ocean heat flux specified. Set it to zero!')
+                self.ocean_heat_flux = 0.0
         try:
             self.water_depth_initial = namelist['surface_budget']['water_depth_initial']
         except:
@@ -159,6 +164,14 @@ cdef class SurfaceBudgetVarying:
         except:
             self.fixed_sst_time = 0.0
 
+        try:
+            self.flux_ice = tv_input_data['flux_ice'][0]
+            self.h_ice = tv_input_data['h_ice'][0]
+        except:
+            self.flux_ice = 0.0
+            self.h_ice = 0.0
+
+        self.t_indx = 0
 
 
         self.water_depth = self.water_depth_initial
@@ -169,6 +182,8 @@ cdef class SurfaceBudgetVarying:
 
     cpdef initialize(self, Grid.Grid Gr,  NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
         NS.add_ts('surface_temperature', Gr, Pa)
+        NS.add_ts('conductive_flux_ice', Gr, Pa)
+        NS.add_ts('ice_thickness', Gr, Pa)
         return
 
     cpdef update(self, Grid.Grid Gr, Radiation.RadiationBase Ra, Surface.SurfaceBase Sur, TimeStepping.TimeStepping TS, ParallelMPI.ParallelMPI Pa):
@@ -180,8 +195,20 @@ cdef class SurfaceBudgetVarying:
             double mean_shf = Pa.HorizontalMeanSurface(Gr, &Sur.shf[0])
             double mean_lhf = Pa.HorizontalMeanSurface(Gr, &Sur.lhf[0])
             double net_flux, tendency
+            double rho_cp_ice = 1.9e6 #Specific heat of ice * density of ice
 
+        if int(TS.t // (3600.0 * 6.0)) > self.t_indx:
 
+            try:
+                fh = open(self.file, 'r')
+                tv_input_data = cPickle.load(fh)
+                fh.close()
+
+                self.flux_ice = tv_input_data['flux_ice'][self.t_indx]
+                self.h_ice = tv_input_data['h_ice'][self.t_indx]
+
+            except:
+                pass
 
         if TS.rk_step != 0:
             return
@@ -196,8 +223,15 @@ cdef class SurfaceBudgetVarying:
                 self.water_depth = self.water_depth_initial
 
 
-            net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - mean_shf - mean_lhf + Ra.srf_lw_down + Ra.srf_sw_down
-            tendency = net_flux/cl/rho_liquid/self.water_depth
+            net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - \
+                        mean_shf - mean_lhf + Ra.srf_lw_down + \
+                        Ra.srf_sw_down
+
+            #Check whether sea ice is present from GCM forcing output
+            if self.h_ice > 0.0:
+                tendency = (net_flux + self.flux_ice) / (rho_cp_ice * self.h_ice)
+            else:
+                tendency = net_flux/cl/rho_liquid/self.water_depth
             Sur.T_surface += tendency *TS.dt
 
         mpi.MPI_Bcast(&Sur.T_surface,count,mpi.MPI_DOUBLE,root, Pa.cart_comm_sub_z)
@@ -205,4 +239,6 @@ cdef class SurfaceBudgetVarying:
         return
     cpdef stats_io(self, Surface.SurfaceBase Sur, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
         NS.write_ts('surface_temperature', Sur.T_surface, Pa)
+        NS.write_ts('conductive_flux_ice', self.flux_ice, Pa)
+        NS.write_ts('ice_thickness', self.h_ice, Pa)
         return

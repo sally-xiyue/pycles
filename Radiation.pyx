@@ -1293,6 +1293,9 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
         NS.add_profile('sw_flux_down', Gr, Pa)
         NS.add_profile('grey_rad_heating', Gr, Pa)
         NS.add_profile('grey_rad_dsdt', Gr, Pa)
+        NS.add_ts('surface_albedo', Gr, Pa)
+        NS.add_ts('toa_sw_flux', Gr, Pa)
+
         tv_data_path = self.file
         fh = open(tv_data_path, 'r')
         tv_input_data = cPickle.load(fh)
@@ -1310,13 +1313,18 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
 
         self.solar_constant = 1360.0
         self.del_sol = 1.2
-        self.insolation = 0.25 * self.solar_constant * (1.0 + self.del_sol * (1.0 - 3.0 * sin(self.lat)**2.0)/4.0)
+        # self.insolation = 0.25 * self.solar_constant * (1.0 + self.del_sol * (1.0 - 3.0 * sin(self.lat)**2.0)/4.0)
+        self.insolation = tv_input_data['swdn_toa'][0]
+
 
         self.lw_tau_exponent = 4.0
         self.sw_tau_exponent = 2.0
 
         self.lw_linear_frac = 0.2
-        self.albedo_value = 0.38
+        try:
+            self.albedo_value = tv_input_data['albedo'][0]
+        except:
+            self.albedo_value = 0.38
         self.atm_abs = 0.22
         self.sw_diff = 0.0
 
@@ -1404,6 +1412,13 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             self.sw_tau = self.sw_tau0 * (np.array(self.p_ext)/101325.0)**self.sw_tau_exponent
             self.lw_tau = self.lw_tau0 * (self.lw_linear_frac *  np.array(self.p_ext)/101325.0 +
                                           (1.0 - self.lw_linear_frac)*(np.array(self.p_ext)/101325.0)**self.lw_tau_exponent)
+
+            self.insolation = input_data_tv['swdn_toa'][self.t_indx]
+
+            try:
+                self.albedo_value = input_data_tv['albedo'][self.t_indx]
+            except:
+                pass
 
             self.t_indx = int(TS.t // (3600.0 * 6.0))
             Pa.root_print('Finished updating time varying Radiation Parameters')
@@ -1518,7 +1533,8 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
         NS.write_ts('srf_lw_flux_down', self.srf_lw_down, Pa)
         NS.write_ts('srf_sw_flux_up', self.srf_sw_up, Pa)
         NS.write_ts('srf_sw_flux_down', self.srf_sw_down, Pa)
-
+        NS.write_ts('surface_albedo', self.albedo_value, Pa)
+        NS.write_ts('toa_sw_flux', self.insolation, Pa)
 
 
         cdef Py_ssize_t npts = Gr.dims.nlg[2] - Gr.dims.gw
