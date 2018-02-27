@@ -62,6 +62,12 @@ cdef class TimeStepping:
             Pa.root_print('t_max (time at end of simulation) not given in name list! Killing Simulation Now')
             Pa.kill()
 
+
+        try:
+            self.acceleration_factor = namelist['time_stepping']['acceleration_factor']
+        except:
+            self.acceleration_factor = 1.0
+
         #Now initialize the correct time stepping routine
         if self.ts_type == 2:
             self.initialize_second(PV)
@@ -78,6 +84,8 @@ cdef class TimeStepping:
 
 
     cpdef update(self, Grid.Grid Gr, PrognosticVariables.PrognosticVariables PV, ParallelMPI.ParallelMPI Pa):
+
+        self.accelerate_tendencies(Gr, PV, Pa)
 
         if self.ts_type == 2:
             self.update_second(Gr,PV)
@@ -105,6 +113,33 @@ cdef class TimeStepping:
                 Pa.root_print('dt = '+ str(self.dt)+ " killing simulation!")
                 Pa.kill()
 
+        return
+
+    cpdef accelerate_tendencies(self, Grid.Grid Gr, PrognosticVariables.PrognosticVariables PV, ParallelMPI.ParallelMPI Pa):
+        cdef:
+            Py_ssize_t u_shift = PV.get_varshift(Gr,'u')
+            Py_ssize_t v_shift = PV.get_varshift(Gr,'v')
+            Py_ssize_t s_shift = PV.get_varshift(Gr, 's')
+            Py_ssize_t qt_shift = PV.get_varshift(Gr, 'qt')
+            double [:] ut_mean = Pa.HorizontalMean(Gr, &PV.tendencies[u_shift])
+            double [:] vt_mean = Pa.HorizontalMean(Gr, &PV.tendencies[v_shift])
+            double [:] qtt_mean = Pa.HorizontalMean(Gr, &PV.tendencies[qt_shift])
+            double [:] st_mean = Pa.HorizontalMean(Gr, &PV.tendencies[s_shift])
+            Py_ssize_t istride = Gr.dims.nlg[1] * Gr.dims.nlg[2]
+            Py_ssize_t jstride = Gr.dims.nlg[2]
+            Py_ssize_t i,j,k,ishift,jshift,ijk
+
+        with nogil:
+            for i in xrange(Gr.dims.nlg[0]):
+                ishift = i * istride
+                for j in xrange(Gr.dims.nlg[1]):
+                    jshift = j * jstride
+                    for k in xrange(Gr.dims.nlg[2]):
+                        ijk = ishift + jshift + k
+                        PV.tendencies[u_shift + ijk] += (self.acceleration_factor-1.0) * ut_mean[k]
+                        PV.tendencies[v_shift + ijk] += (self.acceleration_factor-1.0) * vt_mean[k]
+                        PV.tendencies[s_shift + ijk] += (self.acceleration_factor-1.0) * st_mean[k]
+                        PV.tendencies[qt_shift + ijk] += (self.acceleration_factor-1.0) * qtt_mean[k]
         return
 
 
