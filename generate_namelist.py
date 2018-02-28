@@ -1338,6 +1338,7 @@ def GCMVarying():
     namelist['time_stepping']['dt_initial'] = 1e-6
     namelist['time_stepping']['dt_max'] = 30.0
     namelist['time_stepping']['t_max'] = 3600.0*24.0*50.0 # 50 days
+    namelist['time_stepping']['acceleration_factor'] = 1.0
 
     namelist['thermodynamics'] = {}
     namelist['thermodynamics']['latentheat'] = 'variable'
