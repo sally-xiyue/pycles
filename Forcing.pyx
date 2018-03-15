@@ -1182,7 +1182,7 @@ cdef class ForcingGCMVarying:
             Py_ssize_t s_shift = PV.get_varshift(Gr, 's')
             Py_ssize_t qt_shift = PV.get_varshift(Gr, 'qt')
             Py_ssize_t t_shift = DV.get_varshift(Gr, 'temperature')
-            Py_ssize_t ql_shift = DV.get_varshift(Gr,'ql')
+            Py_ssize_t qv_shift = DV.get_varshift(Gr,'qv')
             double pd, pv, qt, qv, p0, rho0, t
             double zmax, weight, weight_half
             double u0_new, v0_new
@@ -1278,7 +1278,7 @@ cdef class ForcingGCMVarying:
                         p0 = Ref.p0_half[k]
                         rho0 = Ref.rho0_half[k]
                         qt = PV.values[qt_shift + ijk]
-                        qv = qt - DV.values[ql_shift + ijk]
+                        qv = DV.values[qv_shift + ijk]
                         pd = pd_c(p0,qt,qv)
                         pv = pv_c(p0,qt,qv)
                         t  = DV.values[t_shift + ijk]
@@ -1310,7 +1310,7 @@ cdef class ForcingGCMVarying:
             Py_ssize_t s_shift = PV.get_varshift(Gr, 's')
             Py_ssize_t qt_shift = PV.get_varshift(Gr, 'qt')
             Py_ssize_t t_shift = DV.get_varshift(Gr, 'temperature')
-            Py_ssize_t ql_shift = DV.get_varshift(Gr,'ql')
+            Py_ssize_t qv_shift = DV.get_varshift(Gr,'qv')
             double pd, pv, qt, qv, p0, rho0, t
             double zmax, weight, weight_half
 
@@ -1360,7 +1360,7 @@ cdef class ForcingGCMVarying:
                         p0 = Ref.p0_half[k]
                         rho0 = Ref.rho0_half[k]
                         qt = PV.values[qt_shift + ijk]
-                        qv = qt - DV.values[ql_shift + ijk]
+                        qv = DV.values[qv_shift + ijk]
                         pd = pd_c(p0,qt,qv)
                         pv = pv_c(p0,qt,qv)
                         t  = DV.values[t_shift + ijk]
