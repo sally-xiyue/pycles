@@ -40,6 +40,7 @@ cdef class SurfaceBudgetVarying:
         double flux_ice
         double h_ice
         int t_indx
+        bint prescribe_sst
 
     cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa)
     cpdef update(self, Grid.Grid Gr, Radiation.RadiationBase Ra, Surface.SurfaceBase Sur, TimeStepping.TimeStepping TS, ParallelMPI.ParallelMPI Pa)

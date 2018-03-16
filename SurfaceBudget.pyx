@@ -171,6 +171,11 @@ cdef class SurfaceBudgetVarying:
             self.flux_ice = 0.0
             self.h_ice = 0.0
 
+        try:
+            self.prescribe_sst = namelist['surface']['gcm_sst']
+        except:
+            self.prescribe_sst = False
+
         self.t_indx = 0
 
 
@@ -181,6 +186,9 @@ cdef class SurfaceBudgetVarying:
 
 
     cpdef initialize(self, Grid.Grid Gr,  NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
+        if self.prescribe_sst:
+            Pa.root_print('Prescribing SST from GCM!')
+
         NS.add_ts('surface_temperature', Gr, Pa)
         NS.add_ts('conductive_flux_ice', Gr, Pa)
         NS.add_ts('ice_thickness', Gr, Pa)
@@ -192,23 +200,9 @@ cdef class SurfaceBudgetVarying:
             int root = 0
             int count = 1
             double rho_liquid = 1000.0
-            double mean_shf = Pa.HorizontalMeanSurface(Gr, &Sur.shf[0])
-            double mean_lhf = Pa.HorizontalMeanSurface(Gr, &Sur.lhf[0])
+            double mean_shf
+            double mean_lhf
             double net_flux, tendency
-            double rho_cp_ice = 1.9e6 #Specific heat of ice * density of ice
-
-        if int(TS.t // (3600.0 * 6.0)) > self.t_indx:
-
-            try:
-                fh = open(self.file, 'r')
-                tv_input_data = cPickle.load(fh)
-                fh.close()
-
-                self.flux_ice = tv_input_data['flux_ice'][self.t_indx]
-                self.h_ice = tv_input_data['h_ice'][self.t_indx]
-
-            except:
-                pass
 
         if TS.rk_step != 0:
             return
@@ -223,16 +217,31 @@ cdef class SurfaceBudgetVarying:
                 self.water_depth = self.water_depth_initial
 
 
-            net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - \
-                        mean_shf - mean_lhf + Ra.srf_lw_down + \
-                        Ra.srf_sw_down
+            if self.prescribe_sst:
+                if int(TS.t // (3600.0 * 6.0)) > self.t_indx:
+                    fh = open(self.file, 'r')
+                    tv_input_data = cPickle.load(fh)
+                    fh.close()
 
-            #Check whether sea ice is present from GCM forcing output
-            if self.h_ice > 0.0:
-                tendency = (net_flux + self.flux_ice) / (rho_cp_ice * self.h_ice)
+                    Sur.T_surface = tv_input_data['t_surf'][self.t_indx]
+
+                    try:
+                        self.h_ice = tv_input_data['h_ice'][self.t_indx]
+                        self.flux_ice = tv_input_data['flux_ice'][self.t_indx]
+                    except:
+                        pass
+
             else:
+
+                mean_shf = Pa.HorizontalMeanSurface(Gr, &Sur.shf[0])
+                mean_lhf = Pa.HorizontalMeanSurface(Gr, &Sur.lhf[0])
+
+                net_flux =  -self.ocean_heat_flux - Ra.srf_lw_up - Ra.srf_sw_up - \
+                            mean_shf - mean_lhf + Ra.srf_lw_down + \
+                            Ra.srf_sw_down
+
                 tendency = net_flux/cl/rho_liquid/self.water_depth
-            Sur.T_surface += tendency *TS.dt
+                Sur.T_surface += tendency *TS.dt
 
         mpi.MPI_Bcast(&Sur.T_surface,count,mpi.MPI_DOUBLE,root, Pa.cart_comm_sub_z)
 

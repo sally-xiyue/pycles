@@ -1371,12 +1371,17 @@ def GCMVarying():
 
     namelist['gcm'] = {}
     namelist['gcm']['latitude'] = 80.0
-    namelist['gcm']['file'] = './forcing/f_data_tv_90.pkl'
+    namelist['gcm']['file'] = '/Users/xiyue/Clouds/fms_analysis/forcing/f_data_tv_equinox_1_00x_lat80_zonalmean.pkl'
     namelist['gcm']['lw_tau0_eqtr'] = 7.2
     namelist['gcm']['lw_tau0_pole'] = 1.8
 
     namelist['surface'] = {}
     namelist['surface']['gcm_flux'] = True
+    namelist['surface']['gcm_sst'] = True
+
+    namelist['surface_budget'] = {}
+    namelist['surface_budget']['water_depth_initial'] = 5.0
+    namelist['surface_budget']['water_depth_final'] = 5.0
 
     namelist['radiation'] = {}
     namelist['radiation']['use_RRTM'] = False
