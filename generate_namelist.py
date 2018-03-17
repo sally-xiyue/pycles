@@ -1377,7 +1377,7 @@ def GCMVarying():
 
     namelist['surface'] = {}
     namelist['surface']['gcm_flux'] = True
-    namelist['surface']['gcm_sst'] = True
+    # namelist['surface']['gcm_sst'] = True
 
     namelist['surface_budget'] = {}
     namelist['surface_budget']['water_depth_initial'] = 5.0
@@ -1406,6 +1406,9 @@ def GCMVarying():
     namelist['fields_io']['fields_dir'] = "fields"
     namelist['fields_io']['frequency'] = 864000.0
     namelist['fields_io']['diagnostic_fields'] = ['ql', 'temperature', 'buoyancy']
+
+    namelist['visualization'] = {}
+    namelist['visualization']['frequency'] = 86400.0
 
     namelist['meta'] = {}
     namelist['meta']['simname'] = 'GCMVarying'
