@@ -1386,7 +1386,7 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
 
         #Compute time varying profiles
         if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
-
+            self.t_indx = int(TS.t // (3600.0 * 6.0))
             self.gcm_profiles_initialized = True
             Pa.root_print('Updating Time Varying Radiation Parameters')
 
@@ -1420,7 +1420,6 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             except:
                 pass
 
-            self.t_indx = int(TS.t // (3600.0 * 6.0))
             Pa.root_print('Finished updating time varying Radiation Parameters')
 
 

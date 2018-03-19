@@ -1172,7 +1172,7 @@ cdef class SurfaceGCMVarying(SurfaceBase):
 
         #Compute time varying profiles
         if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
-
+            self.t_indx = int(TS.t // (3600.0 * 6.0))
             self.gcm_profiles_initialized = True
             Pa.root_print('Updating Time Varying Radiation Parameters')
 
@@ -1186,8 +1186,8 @@ cdef class SurfaceGCMVarying(SurfaceBase):
 
             self.gustiness = np.sqrt(u*u + v*v) #0.0000001
 
-            self.t_indx = int(TS.t // (3600.0 * 6.0))
-            Pa.root_print('Finished updating time varying Gustiness: ' + str(self.gustiness))
+
+            # Pa.root_print('Finished updating time varying Gustiness: ' + str(self.gustiness))
 
 
 
@@ -1344,7 +1344,7 @@ cdef class SurfaceGCMVaryingForce(SurfaceBase):
 
         #Compute time varying profiles
         if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
-
+            self.t_indx = int(TS.t // (3600.0 * 6.0))
             self.gcm_profiles_initialized = True
             Pa.root_print('Updating Time Varying Surface winds and fluxes!')
 
@@ -1362,8 +1362,8 @@ cdef class SurfaceGCMVaryingForce(SurfaceBase):
 
             self.gustiness = np.sqrt(u*u + v*v) #0.0000001
 
-            self.t_indx = int(TS.t // (3600.0 * 6.0))
-            Pa.root_print('Finished updating time varying Gustiness: ' + str(self.gustiness))
+
+            # Pa.root_print('Finished updating time varying Gustiness: ' + str(self.gustiness))
 
 
         compute_windspeed(&Gr.dims, &PV.values[u_shift], &PV.values[v_shift], &self.windspeed[0], Ref.u0, Ref.v0, self.gustiness)

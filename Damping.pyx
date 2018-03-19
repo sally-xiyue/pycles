@@ -391,22 +391,22 @@ cdef class RayleighGCMVarying:
             double weight
 
 
-        if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
-            self.t_indx = int(TS.t // (3600.0 * 6.0))
-            self.gcm_profiles_initialized = True
-            Pa.root_print('Updating Total Tendencies in damping!')
-
-            fh = open(self.file, 'r')
-            input_data_tv = cPickle.load(fh)
-            fh.close()
-
-
-            zfull = input_data_tv['zfull'][self.t_indx ,::-1]
-            temp_dt_total = input_data_tv['temp_total'][self.t_indx ,::-1]
-            shum_dt_total = input_data_tv['dt_qg_total'][self.t_indx ,::-1]
-
-            self.dt_tg_total = interp_pchip(Gr.zp_half, zfull, temp_dt_total)
-            self.dt_qg_total =  interp_pchip(Gr.zp_half, zfull, shum_dt_total)
+        # if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
+        #     self.t_indx = int(TS.t // (3600.0 * 6.0))
+        #     self.gcm_profiles_initialized = True
+        #     Pa.root_print('Updating Total Tendencies in damping!')
+        #
+        #     fh = open(self.file, 'r')
+        #     input_data_tv = cPickle.load(fh)
+        #     fh.close()
+        #
+        #
+        #     zfull = input_data_tv['zfull'][self.t_indx ,::-1]
+        #     temp_dt_total = input_data_tv['temp_total'][self.t_indx ,::-1]
+        #     shum_dt_total = input_data_tv['dt_qg_total'][self.t_indx ,::-1]
+        #
+        #     self.dt_tg_total = interp_pchip(Gr.zp_half, zfull, temp_dt_total)
+        #     self.dt_qg_total =  interp_pchip(Gr.zp_half, zfull, shum_dt_total)
 
 
         for var_name in PV.name_index:
