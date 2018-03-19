@@ -219,6 +219,7 @@ cdef class SurfaceBudgetVarying:
 
             if self.prescribe_sst:
                 if int(TS.t // (3600.0 * 6.0)) > self.t_indx:
+                    self.t_indx = int(TS.t // (3600.0 * 6.0))
                     fh = open(self.file, 'r')
                     tv_input_data = cPickle.load(fh)
                     fh.close()
