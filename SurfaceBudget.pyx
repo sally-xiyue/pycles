@@ -223,7 +223,7 @@ cdef class SurfaceBudgetVarying:
                     tv_input_data = cPickle.load(fh)
                     fh.close()
 
-                    Sur.T_surface = tv_input_data['t_surf'][self.t_indx]
+                    Sur.T_surface = tv_input_data['ts'][self.t_indx]
 
                     try:
                         self.h_ice = tv_input_data['h_ice'][self.t_indx]
