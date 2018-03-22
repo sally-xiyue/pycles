@@ -1298,6 +1298,7 @@ cdef class SurfaceGCMVaryingForce(SurfaceBase):
         self.CC = ClausiusClapeyron()
         self.CC.initialize(namelist, LH, Pa)
         self.file = str(namelist['gcm']['file'])
+        self.t_indx = 0
 
         return
 
