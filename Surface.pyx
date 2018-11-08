@@ -80,6 +80,10 @@ def SurfaceFactory(namelist, LatentHeat LH, ParallelMPI.ParallelMPI Par):
 
 cdef class SurfaceBase:
     def __init__(self):
+
+        self.dshf_dt_surf = 0.0
+        self.dlhf_dt_surf = 0.0
+
         return
 
     cpdef initialize(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
@@ -1223,6 +1227,13 @@ cdef class SurfaceGCMVarying(SurfaceBase):
             double [:] t_mean = Pa.HorizontalMean(Gr, &DV.values[t_shift])
             double [:] qt_mean = Pa.HorizontalMean(Gr, &PV.values[qt_shift])
 
+            double [:] dshf_dt_surf_2d = np.zeros(Gr.dims.nlg[0]*Gr.dims.nlg[1], dtype=np.double, order='c')
+            double [:] dlhf_dt_surf_2d = np.zeros(Gr.dims.nlg[0]*Gr.dims.nlg[1], dtype=np.double, order='c')
+            double delta_temp = 0.1
+            double delta_temp_inv = 1.0/delta_temp
+            double pv_star1 = self.CC.LT.fast_lookup(self.T_surface+delta_temp)
+            double qv_star1 = eps_v * pv_star1/(Ref.Pg + (eps_v-1.0)*pv_star1)
+
 
         with nogil:
             for i in xrange(gw-1, imax-gw+1):
@@ -1238,6 +1249,13 @@ cdef class SurfaceGCMVarying(SurfaceBase):
                     ustar = sqrt(cm[ij]) * windspeed[ij]
                     self.friction_velocity[ij] = ustar
 
+                    #Get derivatives wrt surface temperature for sea ice model
+                    cp_ = cpm_c(PV.values[qt_shift+ijk])
+                    dshf_dt_surf_2d[ij] = ch * windspeed[ij] * cp_ * Ref.rho0_half[gw]
+                    lam = self.Lambda_fp(DV.values[t_shift+ijk])
+                    lv = self.L_fp(DV.values[t_shift+ijk],lam)
+                    dlhf_dt_surf_2d[ij] = ch * windspeed[ij] * lv * (qv_star1 - qv_star) * delta_temp_inv
+
 
             for i in xrange(gw, imax-gw):
                 for j in xrange(gw, jmax-gw):
@@ -1246,6 +1264,8 @@ cdef class SurfaceGCMVarying(SurfaceBase):
                     self.u_flux[ij] = -interp_2(cm[ij], cm[ij+istride_2d])*interp_2(windspeed[ij], windspeed[ij+istride_2d]) * (PV.values[u_shift + ijk] + Ref.u0)
                     self.v_flux[ij] = -interp_2(cm[ij], cm[ij+1])*interp_2(windspeed[ij], windspeed[ij+1]) * (PV.values[v_shift + ijk] + Ref.v0)
 
+        self.dshf_dt_surf = Pa.HorizontalMeanSurface(Gr, &dshf_dt_surf_2d[0])
+        self.dlhf_dt_surf = Pa.HorizontalMeanSurface(Gr, &dlhf_dt_surf_2d[0])
 
         if TS.t < 3600.0 * -24.0:
             if not self.gcm_profiles_initialized or int(TS.t // (3600.0 * 6.0)) > self.t_indx:
