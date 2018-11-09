@@ -26,6 +26,7 @@ cdef class SurfaceBase:
         double (*Lambda_fp)(double T) nogil
         double dshf_dt_surf
         double dlhf_dt_surf
+        double surface_albedo
 
     cpdef initialize(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa)
     cpdef init_from_restart(self, Restart)

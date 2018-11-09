@@ -409,9 +409,11 @@ cdef class SurfaceBudgetSeaice:
 
                 self.ice_temperature += delta_ice_temperature
                 Sur.T_surface = self.ice_temperature
+                Sur.surface_albedo = 0.5 #sea ice albedo
             else:
                 tendency = net_flux/cl/rho_liquid/self.water_depth
                 Sur.T_surface += tendency *TS.dt
+                Sur.surface_albedo = 0.3 #ocean albedo
 
             # print('net flux ', net_flux)
             # print('basal flux ', basal_flux)

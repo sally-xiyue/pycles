@@ -1282,6 +1282,13 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
             Pa.root_print('lw_tau0_pole not given in namelist')
             Pa.kill()
 
+        try:
+            if namelist['surface_budget']['sea_ice']:
+                self.sea_ice_model = True
+                Pa.root_print('Sea ice model is active, interactive surface albedo.')
+        except:
+            self.sea_ice_model = False
+
         return
 
     cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa):
@@ -1415,10 +1422,10 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
 
             self.insolation = input_data_tv['swdn_toa'][self.t_indx]
 
-            try:
+            if self.sea_ice_model:
+                self.albedo_value = Sur.surface_albedo
+            else:
                 self.albedo_value = input_data_tv['albedo'][self.t_indx]
-            except:
-                pass
 
             Pa.root_print('Finished updating time varying Radiation Parameters')
 

@@ -240,6 +240,8 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
         double p0_les_min
         double dp
 
+        bint sea_ice_model
+
     cpdef initialize(self, Grid.Grid Gr, NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa)
     cpdef initialize_profiles(self, Grid.Grid Gr, ReferenceState.ReferenceState Ref, DiagnosticVariables.DiagnosticVariables DV,
                      NetCDFIO_Stats NS, ParallelMPI.ParallelMPI Pa)

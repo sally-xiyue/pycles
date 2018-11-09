@@ -83,6 +83,7 @@ cdef class SurfaceBase:
 
         self.dshf_dt_surf = 0.0
         self.dlhf_dt_surf = 0.0
+        self.surface_albedo = 0.3
 
         return
 
