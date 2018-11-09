@@ -1252,8 +1252,8 @@ cdef class ForcingGCMVarying:
             Ref.u0 = u0_new
             Ref.v0 = v0_new
 
-            print "\t Ref.u0 = ", Ref.u0
-            print "\t Ref.v0 = ", Ref.v0
+            # print "\t Ref.u0 = ", Ref.u0
+            # print "\t Ref.v0 = ", Ref.v0
 
 
 
@@ -1491,8 +1491,8 @@ cdef class ForcingGCMMean:
             Ref.u0 = u0_new
             Ref.v0 = v0_new
 
-            print "\t Ref.u0 = ", Ref.u0
-            print "\t Ref.v0 = ", Ref.v0
+            # print "\t Ref.u0 = ", Ref.u0
+            # print "\t Ref.v0 = ", Ref.v0
 
 
 
