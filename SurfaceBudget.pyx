@@ -16,6 +16,7 @@ import cPickle
 cimport numpy as np
 import numpy as np
 include "parameters.pxi"
+from libc.math cimport fmin
 
 import cython
 
@@ -406,9 +407,10 @@ cdef class SurfaceBudgetSeaice:
                 self.ice_flux = kice*(Tf - self.ice_temperature)/self.ice_thickness
                 delta_ice_temperature = (net_flux + self.ice_flux)/(kice/self.ice_thickness +
                                                                     (dlw_dt_surf + Sur.dshf_dt_surf + Sur.dlhf_dt_surf))
-
                 self.ice_temperature += delta_ice_temperature
-                Sur.T_surface = self.ice_temperature
+                #Surface ablation
+                Sur.T_surface = fmin(self.ice_temperature, Tf)
+                # Sur.T_surface = self.ice_temperature
                 Sur.surface_albedo = 0.5 #sea ice albedo
             else:
                 tendency = net_flux/cl/rho_liquid/self.water_depth
