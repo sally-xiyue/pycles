@@ -354,6 +354,7 @@ cdef class SurfaceBudgetSeaice:
             double F0 = 120.0 #Basal heat flux coefficient (W/m^2/K)
             double Lhf = 3.0e8 #Latent heat of fusion (J/m^3)
             double kice = 2.0 #Conductivity of ice (W/m/K)
+            double ice_heat_capacity = 2.0e6  #Volumetric heat capacity of sea ice (J/m^3/K)
 
         if TS.rk_step != 0:
             return
@@ -405,8 +406,10 @@ cdef class SurfaceBudgetSeaice:
             if self.ice_thickness > 0.0:
                 #Implicitly calculate ice surface temperature
                 self.ice_flux = kice*(Tf - self.ice_temperature)/self.ice_thickness
-                delta_ice_temperature = (net_flux + self.ice_flux)/(kice/self.ice_thickness +
-                                                                    (dlw_dt_surf + Sur.dshf_dt_surf + Sur.dlhf_dt_surf))
+                # delta_ice_temperature = (net_flux + self.ice_flux)/(kice/self.ice_thickness +
+                #                                                     (dlw_dt_surf + Sur.dshf_dt_surf + Sur.dlhf_dt_surf))
+                delta_ice_temperature = TS.dt * (net_flux + self.ice_flux)/(0.5*self.ice_thickness*ice_heat_capacity)
+
                 self.ice_temperature += delta_ice_temperature
                 #Surface ablation
                 Sur.T_surface = fmin(self.ice_temperature, Tf)
