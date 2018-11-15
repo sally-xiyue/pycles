@@ -346,9 +346,9 @@ cdef class SurfaceBudgetSeaice:
             double mean_shf
             double mean_lhf
             double net_flux, tendency
-            double delta_water_temperature, ice_thickness_tendency
-            double delta_ice_thickness, delta_ice_temperature
-            double mean_windspeed
+            # double delta_water_temperature, ice_thickness_tendency
+            # double delta_ice_thickness
+            double delta_ice_temperature
             double stefan = 5.6734e-8
             double dlw_dt_surf = 0.0
             double F0 = 120.0 #Basal heat flux coefficient (W/m^2/K)
@@ -379,31 +379,39 @@ cdef class SurfaceBudgetSeaice:
                         mean_shf - mean_lhf + Ra.srf_lw_down + \
                         Ra.srf_sw_down
 
-            #Ice basal heat flux
-            basal_flux = F0*(self.water_temperature - Tf)
+            # #Ice basal heat flux
+            # basal_flux = F0*(self.water_temperature - Tf)
+            #
+            # delta_water_temperature = (self.ocean_heat_flux - basal_flux)/self.water_depth/rho_liquid/cl*TS.dt
+            #
+            # ice_thickness_tendency = (- net_flux - basal_flux)/Lhf
+            #
+            # #Update ice thickness
+            # self.ice_thickness += ice_thickness_tendency*TS.dt
+            #
+            # #Frazil growth
+            # if (self.water_temperature + delta_water_temperature) < Tf:
+            #     delta_ice_thickness = (Tf - self.water_temperature) * rho_liquid * cl * self.water_depth / Lhf
+            #     # self.water_temperature = Tf
+            #     delta_water_temperature = Tf - self.water_temperature
+            #     self.ice_thickness += delta_ice_thickness
+            #
+            # if self.ice_thickness < 0.0: #Complete ablation
+            #     delta_water_temperature += -self.ice_thickness * Lhf / (self.water_depth * rho_liquid * cl)
+            #     self.ice_thickness = 0.0
 
-            delta_water_temperature = (self.ocean_heat_flux - basal_flux)/self.water_depth/rho_liquid/cl*TS.dt
+            # #Update mixed layer ocean temperature
+            # self.water_temperature += delta_water_temperature
 
-            ice_thickness_tendency = (- net_flux - basal_flux)/Lhf
+            if int(TS.t // (3600.0 * 6.0)) > self.t_indx:
+                    self.t_indx = int(TS.t // (3600.0 * 6.0))
+                    fh = open(self.file, 'r')
+                    tv_input_data = cPickle.load(fh)
+                    fh.close()
+                    self.ice_thickness = tv_input_data['h_ice'][self.t_indx]
+                    Sur.surface_albedo = tv_input_data['albedo'][self.t_indx]
 
-            #Update ice thickness
-            self.ice_thickness += ice_thickness_tendency*TS.dt
-
-            #Frazil growth
-            if (self.water_temperature + delta_water_temperature) < Tf:
-                delta_ice_thickness = (Tf - self.water_temperature) * rho_liquid * cl * self.water_depth / Lhf
-                # self.water_temperature = Tf
-                delta_water_temperature = Tf - self.water_temperature
-                self.ice_thickness += delta_ice_thickness
-
-            if self.ice_thickness < 0.0: #Complete ablation
-                delta_water_temperature += -self.ice_thickness * Lhf / (self.water_depth * rho_liquid * cl)
-                self.ice_thickness = 0.0
-
-            #Update mixed layer ocean temperature
-            self.water_temperature += delta_water_temperature
-
-            if self.ice_thickness > 0.0:
+            if self.ice_thickness > 0.05: #Ice minimum 5 cm
                 #Implicitly calculate ice surface temperature
                 self.ice_flux = kice*(Tf - self.ice_temperature)/self.ice_thickness
                 # delta_ice_temperature = (net_flux + self.ice_flux)/(kice/self.ice_thickness +
@@ -414,11 +422,11 @@ cdef class SurfaceBudgetSeaice:
                 #Surface ablation
                 Sur.T_surface = fmin(self.ice_temperature, Tf)
                 # Sur.T_surface = self.ice_temperature
-                Sur.surface_albedo = 0.5 #sea ice albedo
+                # Sur.surface_albedo = 0.5 #sea ice albedo
             else:
                 tendency = net_flux/cl/rho_liquid/self.water_depth
                 Sur.T_surface += tendency *TS.dt
-                Sur.surface_albedo = 0.3 #ocean albedo
+                # Sur.surface_albedo = 0.3 #ocean albedo
 
             # print('net flux ', net_flux)
             # print('basal flux ', basal_flux)

@@ -1149,6 +1149,7 @@ cdef class SurfaceGCMVarying(SurfaceBase):
 
         self.T_surface = tv_input_data['ts'][0]
         self.windspeed = np.zeros(Gr.dims.nlg[0]*Gr.dims.nlg[1], dtype=np.double, order='c')
+        self.surface_albedo = tv_input_data['albedo'][0]
 
         NS.add_ts('surface_windspeed', Gr, Pa)
 
