@@ -1285,7 +1285,7 @@ cdef class RadiationGCMGreyVarying(RadiationBase):
         try:
             if namelist['surface_budget']['sea_ice']:
                 self.sea_ice_model = True
-                Pa.root_print('Sea ice model is active, interactive surface albedo.')
+                Pa.root_print('Sea ice model is active, surface albedo is taken from Surface.')
         except:
             self.sea_ice_model = False
 

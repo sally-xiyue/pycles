@@ -1371,7 +1371,7 @@ def GCMVarying():
 
     namelist['gcm'] = {}
     namelist['gcm']['latitude'] = 80.0
-    namelist['gcm']['file'] = '/Users/xiyue/Clouds/fms_analysis/forcing/f_data_tv_1_00x_ice_les_lat70_lon180.pkl'
+    namelist['gcm']['file'] = '/Users/xiyue/Dropbox/WORK/fms_analysis/forcing/f_data_tv_1_00x_ice_les_lat70_lon180.pkl'
     namelist['gcm']['lw_tau0_eqtr'] = 7.2
     namelist['gcm']['lw_tau0_pole'] = 1.8
 

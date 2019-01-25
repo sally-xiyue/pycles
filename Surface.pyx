@@ -1191,6 +1191,7 @@ cdef class SurfaceGCMVarying(SurfaceBase):
             v = input_data_tv['v'][self.t_indx,-1]
 
             self.gustiness = np.sqrt(u*u + v*v) #0.0000001
+            self.surface_albedo = input_data_tv['albedo'][self.t_indx] #Update albedo before radiation
 
 
             # Pa.root_print('Finished updating time varying Gustiness: ' + str(self.gustiness))

@@ -409,18 +409,19 @@ cdef class SurfaceBudgetSeaice:
                     tv_input_data = cPickle.load(fh)
                     fh.close()
                     self.ice_thickness = tv_input_data['h_ice'][self.t_indx]
-                    Sur.surface_albedo = tv_input_data['albedo'][self.t_indx]
+                    # Sur.surface_albedo = tv_input_data['albedo'][self.t_indx]
 
-            if self.ice_thickness > 0.05: #Ice minimum 5 cm
+            if self.ice_thickness > 0.01: #Ice minimum 5 cm
                 #Implicitly calculate ice surface temperature
                 self.ice_flux = kice*(Tf - self.ice_temperature)/self.ice_thickness
-                # delta_ice_temperature = (net_flux + self.ice_flux)/(kice/self.ice_thickness +
-                #                                                     (dlw_dt_surf + Sur.dshf_dt_surf + Sur.dlhf_dt_surf))
-                delta_ice_temperature = TS.dt * (net_flux + self.ice_flux)/(0.5*self.ice_thickness*ice_heat_capacity)
+                delta_ice_temperature = (net_flux + self.ice_flux)/(kice/self.ice_thickness +
+                                        (dlw_dt_surf + Sur.dshf_dt_surf + Sur.dlhf_dt_surf))
+                # delta_ice_temperature = TS.dt * (net_flux + self.ice_flux)/(0.5*self.ice_thickness*ice_heat_capacity)
 
                 self.ice_temperature += delta_ice_temperature
                 #Surface ablation
                 Sur.T_surface = fmin(self.ice_temperature, Tf)
+                self.ice_temperature = Sur.T_surface
                 # Sur.T_surface = self.ice_temperature
                 # Sur.surface_albedo = 0.5 #sea ice albedo
             else:
