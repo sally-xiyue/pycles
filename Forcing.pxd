@@ -188,7 +188,7 @@ cdef class ForcingGCMVarying:
         double [:] shum_dt_vadv
         double [:] shum_dt_hadv
         double [:] temp_spectral
-        double [:] shum_spectral
+        # double [:] shum_spectral
 
 
         double [:] u_dt_hadv
